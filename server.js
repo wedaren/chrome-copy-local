@@ -227,10 +227,8 @@ app.get('/files', async (req, res) => {
 const startServer = async () => {
   await initializeOutputDir();
   
-  app.listen(port, () => {
+  const server = app.listen(port, '127.0.0.1', () => {
     console.log(`
-  app.listen(port, '127.0.0.1', () => {
-
 📡 服务地址: http://localhost:${port}
 📁 保存目录: ${outputDir}
 🔍 状态检查: http://localhost:${port}/status
@@ -239,17 +237,37 @@ const startServer = async () => {
 准备接收来自 Chrome 插件的 DOM 元素...
     `);
   });
+  
+  return server;
 };
 
-// 优雅关闭
-process.on('SIGINT', () => {
-  console.log('\n👋 正在关闭服务器...');
-  process.exit(0);
-});
+// 优雅关闭函数
+const gracefulShutdown = (server) => {
+  return (signal) => {
+    console.log(`\n👋 收到 ${signal} 信号，正在优雅地关闭服务器...`);
+    
+    server.close((err) => {
+      if (err) {
+        console.error('❌ 关闭服务器时发生错误:', err);
+        process.exit(1);
+      }
+      console.log('✅ 服务器已优雅关闭');
+      process.exit(0);
+    });
+    
+    // 如果在10秒内没有完成关闭，强制退出
+    setTimeout(() => {
+      console.log('⚠️  强制关闭服务器');
+      process.exit(1);
+    }, 10000);
+  };
+};
 
-process.on('SIGTERM', () => {
-  console.log('\n👋 正在关闭服务器...');
-  process.exit(0);
-});
-
-startServer().catch(console.error);
+// 启动服务器并设置优雅关闭
+startServer()
+  .then((server) => {
+    // 监听关闭信号
+    process.on('SIGINT', gracefulShutdown(server));
+    process.on('SIGTERM', gracefulShutdown(server));
+  })
+  .catch(console.error);
