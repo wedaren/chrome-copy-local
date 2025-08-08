@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "DOM Catcher",
+  "version": "1.0",
+  "description": "一键选中 DOM 元素并发送到本地服务。",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:*/"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
