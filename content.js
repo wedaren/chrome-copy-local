@@ -53,7 +53,7 @@ if (!window.hasDOMCatcher) {
   // 2. 监听鼠标悬浮，添加高亮
   const mouseoverHandler = (event) => {
     // 避免选中我们自己添加的提示元素
-    if (event.target === document.body || event.target === document.documentElement) {
+    if (event.target === document.body || event.target === document.documentElement || event.target.closest('.dom-catcher-notification')) {
       return;
     }
     
