@@ -143,9 +143,6 @@ if (!window.hasDOMCatcher) {
     document.removeEventListener('mouseover', mouseoverHandler, true);
     document.removeEventListener('click', clickHandler, true);
     document.removeEventListener('keydown', escapeHandler);
-    if (style.parentNode) {
-      style.parentNode.removeChild(style);
-    }
     window.hasDOMCatcher = false;
   };
 
