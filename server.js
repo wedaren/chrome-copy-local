@@ -20,6 +20,17 @@ app.use(express.json({ limit: '50mb' }));
 // 确保 'captured' 目录存在
 const outputDir = path.join(__dirname, 'captured');
 
+// HTML转义函数，防止XSS攻击
+function escapeHtml(unsafe) {
+  if (!unsafe) return 'N/A';
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 const initializeOutputDir = async () => {
   try {
     await fs.mkdir(outputDir, { recursive: true });
@@ -50,7 +61,7 @@ app.post('/receive-dom', async (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Captured DOM Element - ${info?.tagName || 'Unknown'}</title>
+  <title>Captured DOM Element - ${escapeHtml(info?.tagName)}</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -106,31 +117,31 @@ app.post('/receive-dom', async (req, res) => {
     <h2>📋 元素信息</h2>
     <div class="info-item">
       <span class="info-label">标签名:</span>
-      <span class="info-value">${info?.tagName || 'N/A'}</span>
+      <span class="info-value">${escapeHtml(info?.tagName)}</span>
     </div>
     <div class="info-item">
       <span class="info-label">ID:</span>
-      <span class="info-value">${info?.id || 'N/A'}</span>
+      <span class="info-value">${escapeHtml(info?.id)}</span>
     </div>
     <div class="info-item">
       <span class="info-label">Class:</span>
-      <span class="info-value">${info?.className || 'N/A'}</span>
+      <span class="info-value">${escapeHtml(info?.className)}</span>
     </div>
     <div class="info-item">
       <span class="info-label">文本内容:</span>
-      <span class="info-value">${info?.textContent || 'N/A'}</span>
+      <span class="info-value">${escapeHtml(info?.textContent)}</span>
     </div>
     <div class="info-item">
       <span class="info-label">来源URL:</span>
-      <span class="info-value"><a href="${info?.url || '#'}" target="_blank">${info?.url || 'N/A'}</a></span>
+      <span class="info-value"><a href="${escapeHtml(info?.url)}" target="_blank">${escapeHtml(info?.url)}</a></span>
     </div>
     <div class="info-item">
       <span class="info-label">捕获时间:</span>
-      <span class="info-value">${info?.timestamp || 'N/A'}</span>
+      <span class="info-value">${escapeHtml(info?.timestamp)}</span>
     </div>
     <div class="info-item">
       <span class="info-label">文件名:</span>
-      <span class="info-value">${filename}</span>
+      <span class="info-value">${escapeHtml(filename)}</span>
     </div>
   </div>
 
