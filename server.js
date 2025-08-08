@@ -229,7 +229,7 @@ const startServer = async () => {
   
   app.listen(port, () => {
     console.log(`
-🚀 DOM Catcher 本地服务已启动！
+  app.listen(port, '127.0.0.1', () => {
 
 📡 服务地址: http://localhost:${port}
 📁 保存目录: ${outputDir}
