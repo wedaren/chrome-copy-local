@@ -4,7 +4,7 @@ if (!window.hasDOMCatcher) {
 
   const highlightClass = 'dom-catcher-highlight';
 
-  // 1. 添加高亮样式
+  // 1. 添加高亮样式和通知样式
   const style = document.createElement('style');
   style.innerHTML = `
     .${highlightClass} {
@@ -27,6 +27,24 @@ if (!window.hasDOMCatcher) {
       z-index: 10000;
       pointer-events: none;
     }
+
+    .dom-catcher-notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 10001;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      max-width: 300px;
+      word-wrap: break-word;
+    }
+    .dom-catcher-notification.info { background: #2196f3; }
+    .dom-catcher-notification.success { background: #4caf50; }
+    .dom-catcher-notification.error { background: #f44336; }
   `;
   document.head.appendChild(style);
 
@@ -56,11 +74,12 @@ if (!window.hasDOMCatcher) {
     const elementHTML = targetElement.outerHTML;
     
     // 获取元素的基本信息
+    const text = targetElement.textContent || '';
     const elementInfo = {
       tagName: targetElement.tagName.toLowerCase(),
       className: targetElement.className,
       id: targetElement.id,
-      textContent: targetElement.textContent ? targetElement.textContent.substring(0, 100) + '...' : '',
+      textContent: text.length > 100 ? `${text.substring(0, 100)}...` : text,
       url: window.location.href,
       timestamp: new Date().toISOString()
     };
@@ -104,21 +123,7 @@ if (!window.hasDOMCatcher) {
   // 4. 显示通知函数
   const showNotification = (message, type = 'info') => {
     const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: ${type === 'success' ? '#4caf50' : type === 'error' ? '#f44336' : '#2196f3'};
-      color: white;
-      padding: 12px 20px;
-      border-radius: 6px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 14px;
-      z-index: 10001;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      max-width: 300px;
-      word-wrap: break-word;
-    `;
+    notification.className = `dom-catcher-notification ${type}`;
     notification.textContent = message;
     document.body.appendChild(notification);
 
