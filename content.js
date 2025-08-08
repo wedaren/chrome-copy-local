@@ -2,6 +2,9 @@
 if (!window.hasDOMCatcher) {
   window.hasDOMCatcher = true;
 
+  // 获取服务器配置，如果没有则使用默认值
+  const SERVER_URL = window.DOM_CATCHER_SERVER_URL || 'http://localhost:3000';
+
   const highlightClass = 'dom-catcher-highlight';
 
   // 1. 添加高亮样式和通知样式
@@ -87,14 +90,16 @@ if (!window.hasDOMCatcher) {
     console.log('捕获到元素:', elementInfo);
 
     // 显示成功提示
-    showNotification('正在发送元素到本地服务器...');
+    showNotification('正在发送元素到服务器...');
 
     // 清理工作
     cleanup();
 
-    // 发送到本地服务
+    // 发送到配置的服务器
     try {
-      const response = await fetch('http://localhost:3000/receive-dom', {
+      const apiUrl = SERVER_URL.endsWith('/') ? `${SERVER_URL}receive-dom` : `${SERVER_URL}/receive-dom`;
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,14 +114,22 @@ if (!window.hasDOMCatcher) {
       
       if (response.ok) {
         const result = await response.text();
-        showNotification('✅ 成功发送到本地服务！', 'success');
-        console.log('成功发送到本地服务！', result);
+        showNotification('✅ 成功发送到服务器！', 'success');
+        console.log('成功发送到服务器！', result);
       } else {
         throw new Error(`服务器返回错误: ${response.status}`);
       }
     } catch (error) {
       console.error('发送失败:', error);
-      showNotification('❌ 无法连接到本地服务，请确保服务已启动。', 'error');
+      let errorMessage = '❌ 发送失败：';
+      if (error.name === 'TypeError') {
+        errorMessage += '无法连接到服务器';
+      } else if (error.name === 'AbortError') {
+        errorMessage += '请求超时';
+      } else {
+        errorMessage += error.message;
+      }
+      showNotification(errorMessage, 'error');
     }
   };
 
