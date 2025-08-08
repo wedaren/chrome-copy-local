@@ -14,20 +14,6 @@ app.use(cors({
   credentials: true
 }));
 
-// 添加额外的CORS头部处理
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  
-  // 处理预检请求
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
 // 使用 express.json() 中间件来解析 JSON 请求体
 app.use(express.json({ limit: '50mb' }));
 
@@ -36,10 +22,11 @@ const outputDir = path.join(__dirname, 'captured');
 
 const initializeOutputDir = async () => {
   try {
-    await fs.access(outputDir);
-  } catch (error) {
     await fs.mkdir(outputDir, { recursive: true });
-    console.log('创建了 captured 目录');
+    console.log('确保 captured 目录存在');
+  } catch (error) {
+    console.error(`创建目录失败: ${outputDir}`, error);
+    process.exit(1);
   }
 };
 
