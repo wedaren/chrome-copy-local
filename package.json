@@ -14,7 +14,7 @@
     "express",
     "local-server"
   ],
-  "author": "Your Name",
+  "author": "Wedaren & Copilot",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
