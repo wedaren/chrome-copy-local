@@ -6,7 +6,7 @@
   <title>DOM Catcher</title>
   <style>
     body {
-      width: 300px;
+      width: 350px;
       padding: 20px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
@@ -21,10 +21,16 @@
       font-size: 14px;
       cursor: pointer;
       transition: background-color 0.2s;
+      margin-bottom: 8px;
     }
     
     button:hover {
       background-color: #3367d6;
+    }
+    
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
     }
     
     .title {
@@ -40,12 +46,108 @@
       color: #666;
       line-height: 1.4;
     }
+    
+    .server-config {
+      margin-bottom: 16px;
+      padding: 16px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background-color: #f9f9f9;
+    }
+    
+    .config-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+    }
+    
+    .input-group {
+      margin-bottom: 12px;
+    }
+    
+    label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    
+    input[type="url"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    
+    .status-online {
+      background-color: #4caf50;
+    }
+    
+    .status-offline {
+      background-color: #f44336;
+    }
+    
+    .status-checking {
+      background-color: #ff9800;
+    }
+    
+    .test-button {
+      background-color: #6c757d;
+      font-size: 12px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .test-button:hover {
+      background-color: #5a6268;
+    }
+    
+    .main-button {
+      font-size: 16px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
   <div class="title">DOM Catcher</div>
-  <div class="description">点击下方按钮开始选择页面元素，选中的元素将发送到本地服务器。</div>
-  <button id="startSelection">开始选择元素</button>
+  <div class="description">配置本地服务器地址后，点击按钮开始选择页面元素。当前版本仅支持 localhost 连接。</div>
+  
+  <div class="server-config">
+    <div class="config-title">服务器配置</div>
+    <div class="input-group">
+      <label for="serverUrl">服务器地址:</label>
+      <input type="url" id="serverUrl" placeholder="http://localhost:3000" />
+    </div>
+    <button id="testConnection" class="test-button">测试连接</button>
+    <div class="status-indicator">
+      <div class="status-dot status-offline" id="statusDot"></div>
+      <span id="statusText">未连接</span>
+    </div>
+    <div class="permission-info" id="permissionInfo" style="display: none;">
+      <small style="color: #666; font-size: 11px;">
+        🔒 外部服务器需要额外的网络权限
+      </small>
+    </div>
+  </div>
+  
+  <button id="startSelection" class="main-button" disabled>开始选择元素</button>
   <script src="popup.js"></script>
 </body>
 </html>
