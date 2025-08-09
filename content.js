@@ -44,6 +44,7 @@ if (!window.hasDOMCatcher) {
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       max-width: 300px;
       word-wrap: break-word;
+      white-space: pre-line;
     }
     .dom-catcher-notification.info { background: #2196f3; }
     .dom-catcher-notification.success { background: #4caf50; }
@@ -67,6 +68,90 @@ if (!window.hasDOMCatcher) {
     lastElement = event.target;
   };
 
+  // 2.5. 处理相对链接转绝对链接的函数 - 优化版本（单次遍历）
+  const convertRelativeToAbsolute = (element) => {
+    const clone = element.cloneNode(true);
+    const currentPath = window.location.href;
+    
+    // 辅助函数：检查URL是否需要转换
+    const needsConversion = (url) => {
+      return url && 
+             !url.startsWith('http') && 
+             !url.startsWith('data:') && 
+             !url.startsWith('//') && 
+             !url.startsWith('mailto:') && 
+             !url.startsWith('tel:') && 
+             !url.startsWith('#') && 
+             !url.startsWith('javascript:');
+    };
+    
+    // 辅助函数：安全地转换URL
+    const convertUrl = (url, context = '') => {
+      try {
+        return new URL(url, currentPath).href;
+      } catch (e) {
+        console.warn(`无法转换${context}:`, url, e);
+        return url; // 返回原始URL
+      }
+    };
+    
+    // 单次遍历处理所有元素
+    const elementsToProcess = [clone, ...clone.querySelectorAll('*')];
+    elementsToProcess.forEach(el => {
+      // 处理 img 标签的 src 属性
+      if (el.tagName === 'IMG') {
+        const src = el.getAttribute('src');
+        if (needsConversion(src)) {
+          el.setAttribute('src', convertUrl(src, 'img src'));
+        }
+      }
+      
+      // 处理 a 标签的 href 属性
+      if (el.tagName === 'A') {
+        const href = el.getAttribute('href');
+        if (needsConversion(href)) {
+          el.setAttribute('href', convertUrl(href, 'a href'));
+        }
+      }
+      
+      // 处理 CSS 背景图片
+      const style = el.getAttribute('style');
+      if (style && style.includes('url(')) {
+        const updatedStyle = style.replace(/url\(['"]?([^'")]+)['"]?\)/g, (match, url) => {
+          if (needsConversion(url)) {
+            const absoluteUrl = convertUrl(url, 'CSS background');
+            return `url('${absoluteUrl}')`;
+          }
+          return match;
+        });
+        el.setAttribute('style', updatedStyle);
+      }
+      
+      // 处理其他URL属性
+      const urlAttributes = ['srcset', 'data-src', 'data-original', 'data-lazy'];
+      urlAttributes.forEach(attr => {
+        const value = el.getAttribute(attr);
+        if (needsConversion(value)) {
+          if (attr === 'srcset') {
+            // 处理srcset可能包含多个URL的情况
+            const srcsetValue = value.replace(/(\S+)(\s+\S+)?/g, (match, url, descriptor) => {
+              if (needsConversion(url)) {
+                const absoluteUrl = convertUrl(url, `srcset ${attr}`);
+                return absoluteUrl + (descriptor || '');
+              }
+              return match;
+            });
+            el.setAttribute(attr, srcsetValue);
+          } else {
+            el.setAttribute(attr, convertUrl(value, attr));
+          }
+        }
+      });
+    });
+    
+    return clone;
+  };
+
   // 3. 监听点击，捕获并发送数据
   const clickHandler = async (event) => {
     // 阻止默认行为，例如链接跳转
@@ -74,7 +159,10 @@ if (!window.hasDOMCatcher) {
     event.stopPropagation();
 
     const targetElement = event.target;
-    const elementHTML = targetElement.outerHTML;
+    
+    // 处理相对链接转换为绝对链接
+    const processedElement = convertRelativeToAbsolute(targetElement);
+    const elementHTML = processedElement.outerHTML;
     
     // 获取元素的基本信息
     const text = targetElement.textContent || '';
@@ -84,13 +172,21 @@ if (!window.hasDOMCatcher) {
       id: targetElement.id,
       textContent: text.length > 100 ? `${text.substring(0, 100)}...` : text,
       url: window.location.href,
-      timestamp: new Date().toISOString()
+      baseUrl: window.location.origin,
+      pageTitle: document.title || '',
+      timestamp: new Date().toISOString(),
+      // 统计转换的链接信息
+      linkStats: {
+        totalImages: processedElement.querySelectorAll('img[src]').length,  
+        totalLinks: processedElement.querySelectorAll('a[href]').length,
+        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background-image"]').length > 0
+      }
     };
 
     console.log('捕获到元素:', elementInfo);
 
     // 显示成功提示
-    showNotification('正在发送元素到服务器...');
+    showNotification('正在发送元素到服务器并生成文件...');
 
     // 清理工作
     cleanup();
@@ -113,8 +209,9 @@ if (!window.hasDOMCatcher) {
       });
       
       if (response.ok) {
-        const result = await response.text();
-        showNotification('✅ 成功发送到服务器！', 'success');
+        const result = await response.json();
+        const message = `✅ 成功生成文件！\n📄 HTML: ${result.files?.html?.filename}\n📝 Markdown: ${result.files?.markdown?.filename}`;
+        showNotification(message, 'success');
         console.log('成功发送到服务器！', result);
       } else {
         throw new Error(`服务器返回错误: ${response.status}`);
@@ -140,12 +237,13 @@ if (!window.hasDOMCatcher) {
     notification.textContent = message;
     document.body.appendChild(notification);
 
-    // 3秒后自动移除
+    // 5秒后自动移除（成功消息稍长展示）
+    const timeout = type === 'success' ? 5000 : 3000;
     setTimeout(() => {
       if (notification.parentNode) {
         notification.parentNode.removeChild(notification);
       }
-    }, 3000);
+    }, timeout);
   };
 
   // 5. 清理函数，移除所有监听器和样式
@@ -173,5 +271,5 @@ if (!window.hasDOMCatcher) {
   document.addEventListener('keydown', escapeHandler);
   
   // 显示开始提示
-  showNotification('元素选择模式已激活，悬停查看元素，点击选择，按ESC退出');
+  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n现在会同时生成 HTML 和 Markdown 文件');
 }
