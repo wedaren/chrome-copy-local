@@ -85,6 +85,7 @@ if (!window.hasDOMCatcher) {
       id: targetElement.id,
       textContent: text.length > 100 ? `${text.substring(0, 100)}...` : text,
       url: window.location.href,
+      pageTitle: document.title || '', // 添加页面标题
       timestamp: new Date().toISOString()
     };
 

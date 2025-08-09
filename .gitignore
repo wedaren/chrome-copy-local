@@ -97,6 +97,7 @@ logs/
 
 # Captured files (generated content)
 captured/*.html
+captured/*.md
 
 # Chrome extension package files
 *.crx

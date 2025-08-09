@@ -345,42 +345,38 @@ app.post('/receive-dom', async (req, res) => {
 
 // 生成 Markdown 内容的函数
 function generateMarkdownContent(html, info, baseFilename) {
-  const timestamp = info?.timestamp ? new Date(info.timestamp).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN');
-  
   // 转换 HTML 到 Markdown
-  const markdownBody = simpleHtmlToMarkdown(html, info);
+  let markdownBody = simpleHtmlToMarkdown(html, info);
   
-  // 创建完整的 Markdown 文档
-  const markdownContent = `# DOM 元素捕获报告
-
-## 📋 元素信息
-
-| 项目 | 值 |
-|------|-----|
-| 标签名 | \`${info?.tagName || 'N/A'}\` |
-| ID | \`${info?.id || 'N/A'}\` |
-| Class | \`${info?.className || 'N/A'}\` |
-| 文本内容 | ${info?.textContent ? `\`${info.textContent}\`` : 'N/A'} |
-| 来源URL | ${info?.url ? `[${info.url}](${info.url})` : 'N/A'} |
-| 捕获时间 | ${timestamp} |
-| 文件名 | \`${baseFilename}\` |
-
-## 🎯 捕获的元素内容
-
-${markdownBody}
-
-## 📄 原始HTML
-
-\`\`\`html
-${html}
-\`\`\`
-
----
-
-*此文件由 DOM Catcher 自动生成*
-`;
-
-  return markdownContent;
+  // 检查是否已经有一级标题
+  const hasH1 = markdownBody.includes('# ');
+  
+  // 如果没有一级标题，使用网页标题或默认标题
+  if (!hasH1) {
+    let title = '捕获的内容';
+    
+    // 优先使用页面标题
+    if (info?.pageTitle && info.pageTitle.trim()) {
+      title = info.pageTitle.trim();
+    } 
+    // 其次使用元素的文本内容（如果较短且合适）
+    else if (info?.textContent && info.textContent.length > 0 && info.textContent.length < 60) {
+      title = info.textContent.trim();
+    }
+    // 最后使用 URL 域名
+    else if (info?.url) {
+      try {
+        const url = new URL(info.url);
+        title = url.hostname || '捕获的内容';
+      } catch (e) {
+        title = '捕获的内容';
+      }
+    }
+    
+    markdownBody = `# ${title}\n\n${markdownBody}`;
+  }
+  
+  return markdownBody.trim();
 }
 
 // 添加一个简单的状态检查端点
