@@ -1,0 +1,243 @@
+name: Release Chrome Extension
+
+# 触发条件
+on:
+  # 当推送标签时自动触发（如：v1.0.0）
+  push:
+    tags:
+      - 'v*'
+  
+  # 允许手动触发工作流
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如：1.0.1）'
+        required: true
+        default: '1.0.1'
+      release_notes:
+        description: '发布说明'
+        required: false
+        default: 'Bug fixes and improvements'
+
+# 并发控制，确保同时只有一个发布任务运行
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. 检出代码
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史，用于生成变更日志
+      
+      # 2. 设置 Node.js 环境
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      # 3. 安装依赖
+      - name: 安装依赖
+        run: |
+          npm ci
+          # 安装用于打包和发布的工具
+          npm install -g chrome-webstore-upload-cli
+      
+      # 4. 检测版本号
+      - name: 检测版本号
+        id: version
+        run: |
+          if [[ ${{ github.event_name }} == 'push' ]]; then
+            # 从 Git 标签获取版本号
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "从标签获取版本: $VERSION"
+          elif [[ ${{ github.event_name }} == 'workflow_dispatch' ]]; then
+            # 从手动输入获取版本号
+            VERSION="${{ github.event.inputs.version }}"
+            echo "手动指定版本: $VERSION"
+          else
+            echo "无法确定版本号"
+            exit 1
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      
+      # 5. 更新 manifest.json 版本号
+      - name: 更新扩展版本号
+        run: |
+          # 使用 jq 更新 manifest.json 中的版本号
+          jq --arg version "$VERSION" '.version = $version' manifest.json > manifest.tmp
+          mv manifest.tmp manifest.json
+          
+          echo "已更新 manifest.json 版本号为: $VERSION"
+          cat manifest.json | jq '.version'
+      
+      # 6. 运行测试（如果有）
+      - name: 运行测试
+        run: |
+          if [ -f "package.json" ] && grep -q '"test"' package.json; then
+            npm test
+          else
+            echo "没有找到测试脚本，跳过测试"
+          fi
+      
+      # 7. 构建扩展包
+      - name: 构建扩展包
+        run: |
+          # 创建构建目录
+          mkdir -p dist
+          
+          # 复制扩展文件到构建目录（排除不需要的文件）
+          cp -r . dist/extension
+          cd dist/extension
+          
+          # 清理不需要的文件
+          rm -rf node_modules
+          rm -rf .git
+          rm -rf .github
+          rm -rf dist
+          rm -f package*.json
+          rm -f server.js
+          rm -f *.md
+          rm -f .gitignore
+          rm -f *.ipynb
+          rm -rf captured
+          
+          # 创建 ZIP 包
+          cd ..
+          zip -r extension.zip extension/
+          
+          echo "扩展包已创建: dist/extension.zip"
+          ls -la extension.zip
+      
+      # 8. 验证扩展包
+      - name: 验证扩展包
+        run: |
+          cd dist
+          unzip -l extension.zip | head -20
+          
+          # 检查必需文件是否存在
+          if unzip -l extension.zip | grep -q "manifest.json"; then
+            echo "✓ manifest.json 存在"
+          else
+            echo "✗ manifest.json 不存在"
+            exit 1
+          fi
+          
+          if unzip -l extension.zip | grep -q "popup.html"; then
+            echo "✓ popup.html 存在"
+          else
+            echo "✗ popup.html 不存在"
+            exit 1
+          fi
+      
+      # 9. 上传到 Chrome Web Store
+      - name: 发布到 Chrome Web Store
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          EXTENSION_ID: ${{ secrets.EXTENSION_ID }}
+        run: |
+          echo "开始上传扩展到 Chrome Web Store..."
+          
+          # 使用 chrome-webstore-upload-cli 上传
+          npx chrome-webstore-upload-cli upload \
+            --source dist/extension.zip \
+            --extension-id $EXTENSION_ID \
+            --client-id $GOOGLE_CLIENT_ID \
+            --client-secret $GOOGLE_CLIENT_SECRET \
+            --refresh-token $GOOGLE_REFRESH_TOKEN \
+            --auto-publish
+      
+      # 10. 创建 GitHub Release
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "DOM Catcher v${{ env.VERSION }}"
+          body: |
+            ## 🚀 DOM Catcher v${{ env.VERSION }}
+            
+            ### 📦 更新内容
+            ${{ github.event.inputs.release_notes || '本次更新包含功能改进和错误修复。' }}
+            
+            ### 📋 安装方式
+            1. **从 Chrome Web Store 安装**（推荐）
+               - 访问 [Chrome Web Store](https://chrome.google.com/webstore/detail/${{ secrets.EXTENSION_ID }})
+               - 点击"添加至 Chrome"
+            
+            2. **手动安装**
+               - 下载下方的 `extension.zip` 文件
+               - 解压到本地文件夹
+               - 在 Chrome 中打开 `chrome://extensions/`
+               - 开启"开发者模式"
+               - 点击"加载已解压的扩展程序"
+               - 选择解压后的文件夹
+            
+            ### 🔧 使用方法
+            1. 配置服务器地址（默认：http://localhost:3000）
+            2. 测试服务器连接状态
+            3. 点击"开始选择元素"捕获网页内容
+            
+            ### 📝 更新日志
+            查看 [完整更新日志](https://github.com/${{ github.repository }}/blob/main/自定义服务器功能说明.md)
+            
+            ---
+            **版本信息**
+            - 构建时间: ${{ github.run_id }}
+            - 提交: ${{ github.sha }}
+          files: |
+            dist/extension.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # 11. 通知结果
+      - name: 发布完成通知
+        run: |
+          echo "🎉 Chrome 扩展发布完成！"
+          echo ""
+          echo "📊 发布信息："
+          echo "   版本: ${{ env.VERSION }}"
+          echo "   扩展 ID: ${{ secrets.EXTENSION_ID }}"
+          echo "   GitHub Release: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          echo ""
+          echo "🔗 访问链接："
+          echo "   Chrome Web Store: https://chrome.google.com/webstore/detail/${{ secrets.EXTENSION_ID }}"
+          echo "   GitHub 仓库: https://github.com/${{ github.repository }}"
+          echo ""
+          echo "⏰ 注意事项："
+          echo "   • Chrome Web Store 审核通常需要几小时到几天时间"
+          echo "   • 在审核通过之前，新版本不会对公众可见"
+          echo "   • 你可以在 Chrome Web Store 开发者控制台查看审核状态"
+      
+      # 12. 错误处理
+      - name: 发布失败处理
+        if: failure()
+        run: |
+          echo "❌ 发布过程中出现错误！"
+          echo ""
+          echo "🔍 可能的原因："
+          echo "   • API 凭据配置错误"
+          echo "   • 网络连接问题"
+          echo "   • Chrome Web Store 服务异常"
+          echo "   • 扩展包格式问题"
+          echo ""
+          echo "🛠 解决方案："
+          echo "   1. 检查 GitHub Secrets 配置"
+          echo "   2. 验证扩展 ID 是否正确"
+          echo "   3. 确认 Google API 凭据有效"
+          echo "   4. 查看详细错误日志"
+          echo ""
+          echo "📞 获取帮助："
+          echo "   • GitHub Issues: https://github.com/${{ github.repository }}/issues"
+          echo "   • Chrome Web Store 支持: https://support.google.com/chrome_webstore/"

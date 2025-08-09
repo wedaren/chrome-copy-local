@@ -103,6 +103,14 @@ captured/*.html
 *.pem
 *.zip
 
+# Build and distribution files
+dist/
+build/
+
+# Chrome Web Store API credentials
+auth-config.json
+credentials.json
+
 # Temporary files
 tmp/
 temp/

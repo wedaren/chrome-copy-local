@@ -165,3 +165,53 @@ const outputDir = path.join(__dirname, 'captured'); // 修改保存路径
 ## 📄 许可证
 
 MIT License - 详见LICENSE文件
+
+## 🚀 自动化发布
+
+本项目已配置完整的 GitHub Actions 自动化发布流程，支持一键发布到 Chrome Web Store。
+
+### 📦 发布功能
+- **自动构建**: 推送版本标签时自动构建扩展包
+- **自动上传**: 自动上传到 Chrome Web Store 并发布
+- **版本管理**: 自动创建 GitHub Release
+- **错误处理**: 完整的错误提示和故障排除
+
+### 🛠 发布工具
+- **[Chrome扩展自动化发布指南.md](Chrome扩展自动化发布指南.md)**: 完整的配置和使用指南
+- **[scripts/](scripts/)**: 本地发布脚本和认证配置工具
+- **[自定义服务器功能说明.md](自定义服务器功能说明.md)**: 扩展功能详细说明
+
+### ⚡ 快速发布
+
+```bash
+# 1. 首次配置（仅需一次）
+node scripts/setup-webstore-auth.js
+
+# 2. 完成 Chrome Web Store 账户配置
+# - 设置并验证联系邮箱
+# - 完成隐私政策认证
+# 详见：发布前必须完成的步骤.md
+
+# 3. 本地测试构建
+./scripts/test-build.sh
+
+# 4. 快速发布新版本
+./scripts/release.sh 1.1.0
+
+# 5. 推送标签触发自动发布
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+### ⚠️ 发布前必读
+如果遇到 "Unable to publish" 错误，请查看：
+- **发布前必须完成的步骤.md** - 解决发布阻塞问题
+- **Chrome Web Store 故障排除指南.md** - 快速故障排除
+
+### 📋 配置要求
+需要在 GitHub 仓库设置中添加以下 Secrets：
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET` 
+- `GOOGLE_REFRESH_TOKEN`
+- `EXTENSION_ID`
+
+详细配置步骤请参考 **Chrome扩展自动化发布指南.md**。
