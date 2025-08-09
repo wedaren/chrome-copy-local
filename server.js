@@ -64,8 +64,8 @@ function simpleHtmlToMarkdown(html, info) {
     })
     .replace(/<ol[^>]*>(.*?)<\/ol>/gis, (match, content) => {
       let counter = 1;
-      const items = content.replace(/<li[^>]*>(.*?)<\/li>/gi, () => {
-        return `${counter++}. $1\n`;
+      const items = content.replace(/<li[^>]*>(.*?)<\/li>/gi, (match, itemContent) => {
+        return `${counter++}. ${itemContent.trim()}\n`;
       });
       return '\n' + items + '\n';
     })
@@ -480,6 +480,9 @@ app.post('/receive-dom', async (req, res) => {
 
 // 生成 Markdown 内容的函数
 function generateMarkdownContent(html, info, baseFilename) {
+
+  const MAX_TITLE_LENGTH_FROM_CONTENT = 60;
+
   // 转换 HTML 到 Markdown - 使用改进的 jsdom 转换
   let markdownBody = htmlToMarkdown(html, info);
   
@@ -495,7 +498,7 @@ function generateMarkdownContent(html, info, baseFilename) {
       title = info.pageTitle.trim();
     } 
     // 其次使用元素的文本内容（如果较短且合适）
-    else if (info?.textContent && info.textContent.length > 0 && info.textContent.length < 60) {
+    else if (info?.textContent && info.textContent.length > 0 && info.textContent.length < MAX_TITLE_LENGTH_FROM_CONTENT) {
       title = info.textContent.trim();
     }
     // 最后使用 URL 域名

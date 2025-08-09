@@ -96,8 +96,8 @@ if (!window.hasDOMCatcher) {
     };
     
     // 单次遍历处理所有元素
-    const allElements = clone.querySelectorAll('*');
-    allElements.forEach(el => {
+    const elementsToProcess = [clone, ...clone.querySelectorAll('*')];
+    elementsToProcess.forEach(el => {
       // 处理 img 标签的 src 属性
       if (el.tagName === 'IMG') {
         const src = el.getAttribute('src');
@@ -179,7 +179,7 @@ if (!window.hasDOMCatcher) {
       linkStats: {
         totalImages: processedElement.querySelectorAll('img[src]').length,  
         totalLinks: processedElement.querySelectorAll('a[href]').length,
-        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background"]').length > 0
+        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background-image"]').length > 0
       }
     };
 
