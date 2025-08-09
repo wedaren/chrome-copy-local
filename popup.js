@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadServerConfig();
 
   // 绑定事件
-  serverUrlInput.addEventListener('input', onServerUrlChange);
+  serverUrlInput.addEventListener('change', onServerUrlChange);
   testConnectionButton.addEventListener('click', testServerConnection);
   startSelectionButton.addEventListener('click', startSelection);
 

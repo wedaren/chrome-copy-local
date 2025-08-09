@@ -97,7 +97,7 @@ if (!window.hasDOMCatcher) {
 
     // 发送到配置的服务器
     try {
-      const apiUrl = SERVER_URL.endsWith('/') ? `${SERVER_URL}receive-dom` : `${SERVER_URL}/receive-dom`;
+      const apiUrl = new URL('receive-dom', SERVER_URL).href;
       
       const response = await fetch(apiUrl, {
         method: 'POST',
