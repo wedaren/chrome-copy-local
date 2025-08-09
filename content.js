@@ -44,6 +44,7 @@ if (!window.hasDOMCatcher) {
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       max-width: 300px;
       word-wrap: break-word;
+      white-space: pre-line;
     }
     .dom-catcher-notification.info { background: #2196f3; }
     .dom-catcher-notification.success { background: #4caf50; }
@@ -90,7 +91,7 @@ if (!window.hasDOMCatcher) {
     console.log('捕获到元素:', elementInfo);
 
     // 显示成功提示
-    showNotification('正在发送元素到服务器...');
+    showNotification('正在发送元素到服务器并生成文件...');
 
     // 清理工作
     cleanup();
@@ -113,8 +114,9 @@ if (!window.hasDOMCatcher) {
       });
       
       if (response.ok) {
-        const result = await response.text();
-        showNotification('✅ 成功发送到服务器！', 'success');
+        const result = await response.json();
+        const message = `✅ 成功生成文件！\n📄 HTML: ${result.files?.html?.filename}\n📝 Markdown: ${result.files?.markdown?.filename}`;
+        showNotification(message, 'success');
         console.log('成功发送到服务器！', result);
       } else {
         throw new Error(`服务器返回错误: ${response.status}`);
@@ -140,12 +142,13 @@ if (!window.hasDOMCatcher) {
     notification.textContent = message;
     document.body.appendChild(notification);
 
-    // 3秒后自动移除
+    // 5秒后自动移除（成功消息稍长展示）
+    const timeout = type === 'success' ? 5000 : 3000;
     setTimeout(() => {
       if (notification.parentNode) {
         notification.parentNode.removeChild(notification);
       }
-    }, 3000);
+    }, timeout);
   };
 
   // 5. 清理函数，移除所有监听器和样式
@@ -173,5 +176,5 @@ if (!window.hasDOMCatcher) {
   document.addEventListener('keydown', escapeHandler);
   
   // 显示开始提示
-  showNotification('元素选择模式已激活，悬停查看元素，点击选择，按ESC退出');
+  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n现在会同时生成 HTML 和 Markdown 文件');
 }
