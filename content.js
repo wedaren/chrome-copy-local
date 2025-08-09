@@ -177,7 +177,7 @@ if (!window.hasDOMCatcher) {
       timestamp: new Date().toISOString(),
       // 统计转换的链接信息
       linkStats: {
-        totalImages: processedElement.querySelectorAll('img').length,
+        totalImages: processedElement.querySelectorAll('img[src]').length,  
         totalLinks: processedElement.querySelectorAll('a[href]').length,
         hasBackgroundImages: processedElement.querySelectorAll('*[style*="background"]').length > 0
       }

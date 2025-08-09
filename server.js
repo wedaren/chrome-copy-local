@@ -4,25 +4,24 @@ const path = require('path');
 const cors = require('cors');
 
 // HTML 到 Markdown 转换函数
-function htmlToMarkdown(html, info) {
-  // 创建一个简单的 DOM 解析器
-  const jsdom = require('jsdom');
-  const { JSDOM } = jsdom;
-  
-  // 如果 jsdom 不可用，使用简单的正则替换
-  if (!jsdom) {
-    return simpleHtmlToMarkdown(html, info);
-  }
-  
-  try {
-    const dom = new JSDOM(html);
-    const element = dom.window.document.body.firstChild;
-    return convertElementToMarkdown(element, info);
-  } catch (error) {
-    console.log('使用 jsdom 转换失败，回退到简单转换方案:', error.message);
-    return simpleHtmlToMarkdown(html, info);
-  }
-}
+function htmlToMarkdown(html, info) {  
+  try {  
+    const jsdom = require('jsdom');  
+    const { JSDOM } = jsdom;  
+    const dom = new JSDOM(html);  
+    
+    // 处理 body 中的所有子元素，而不仅仅是第一个
+    let result = '';
+    for (let child of dom.window.document.body.childNodes) {
+      result += convertElementToMarkdown(child, info);
+    }
+    
+    return result.trim();
+  } catch (error) {  
+    console.log('jsdom 转换失败或未安装，回退到简单转换方案:', error.message);  
+    return simpleHtmlToMarkdown(html, info);  
+  }  
+}  
 
 // 简单的 HTML 到 Markdown 转换（不依赖外部库）
 function simpleHtmlToMarkdown(html, info) {
@@ -109,41 +108,163 @@ function simpleHtmlToMarkdown(html, info) {
   return markdown;
 }
 
-// 使用 jsdom 的高级转换（如果可用）
+// 使用 jsdom 的高级转换（如果可用）- 递归遍历DOM树
 function convertElementToMarkdown(element, info) {
   if (!element) return '';
   
-  const tagName = element.tagName?.toLowerCase();
-  const textContent = element.textContent || '';
+  // 处理文本节点
+  if (element.nodeType === 3) { // TEXT_NODE
+    return element.textContent || '';
+  }
   
+  // 处理元素节点
+  if (element.nodeType !== 1) { // 不是 ELEMENT_NODE
+    return '';
+  }
+  
+  const tagName = element.tagName?.toLowerCase();
+  
+  // 递归处理子元素的辅助函数
+  const processChildren = () => {
+    let result = '';
+    for (let child of element.childNodes) {
+      result += convertElementToMarkdown(child, info);
+    }
+    return result;
+  };
+  
+  // 根据标签类型处理
   switch (tagName) {
-    case 'h1': return `# ${textContent}\n\n`;
-    case 'h2': return `## ${textContent}\n\n`;
-    case 'h3': return `### ${textContent}\n\n`;
-    case 'h4': return `#### ${textContent}\n\n`;
-    case 'h5': return `##### ${textContent}\n\n`;
-    case 'h6': return `###### ${textContent}\n\n`;
-    case 'p': return `${textContent}\n\n`;
+    case 'h1': 
+      return `# ${processChildren()}\n\n`;
+    case 'h2': 
+      return `## ${processChildren()}\n\n`;
+    case 'h3': 
+      return `### ${processChildren()}\n\n`;
+    case 'h4': 
+      return `#### ${processChildren()}\n\n`;
+    case 'h5': 
+      return `##### ${processChildren()}\n\n`;
+    case 'h6': 
+      return `###### ${processChildren()}\n\n`;
+    case 'p': 
+      return `${processChildren()}\n\n`;
     case 'strong':
-    case 'b': return `**${textContent}**`;
+    case 'b': 
+      return `**${processChildren()}**`;
     case 'em':
-    case 'i': return `*${textContent}*`;
-    case 'code': return `\`${textContent}\``;
-    case 'pre': return `\n\`\`\`\n${textContent}\n\`\`\`\n\n`;
+    case 'i': 
+      return `*${processChildren()}*`;
+    case 'code': 
+      return `\`${processChildren()}\``;
+    case 'pre': 
+      return `\n\`\`\`\n${processChildren()}\n\`\`\`\n\n`;
+    case 'br':
+      return '\n';
     case 'a':
       const href = element.getAttribute('href');
-      return href ? `[${textContent}](${href})` : textContent;
+      const linkText = processChildren();
+      return href ? `[${linkText}](${href})` : linkText;
     case 'img':
       const src = element.getAttribute('src');
       const alt = element.getAttribute('alt') || 'Image';
       return src ? `![${alt}](${src})` : '';
+    case 'ul':
+      let ulResult = '\n';
+      for (let child of element.childNodes) {
+        if (child.tagName?.toLowerCase() === 'li') {
+          ulResult += `- ${convertElementToMarkdown(child, info).trim()}\n`;
+        }
+      }
+      return ulResult + '\n';
+    case 'ol':
+      let olResult = '\n';
+      let counter = 1;
+      for (let child of element.childNodes) {
+        if (child.tagName?.toLowerCase() === 'li') {
+          olResult += `${counter++}. ${convertElementToMarkdown(child, info).trim()}\n`;
+        }
+      }
+      return olResult + '\n';
+    case 'li':
+      return processChildren();
+    case 'blockquote':
+      const quoteContent = processChildren().trim();
+      return '\n> ' + quoteContent.replace(/\n/g, '\n> ') + '\n\n';
+    case 'table':
+      return processTable(element, info);
+    case 'thead':
+    case 'tbody':
+    case 'tfoot':
+      return processChildren();
+    case 'tr':
+      return processChildren();
+    case 'th':
+    case 'td':
+      return processChildren();
+    case 'div':
+    case 'section':
+    case 'article':
+    case 'main':
+    case 'header':
+    case 'footer':
+    case 'nav':
+    case 'aside':
+      // 容器元素，直接处理子元素，添加适当的间距
+      const childContent = processChildren();
+      return childContent ? childContent + (childContent.endsWith('\n\n') ? '' : '\n') : '';
+    case 'span':
+      // 内联元素，直接返回子内容
+      return processChildren();
     default:
-      return textContent;
+      // 对于未知元素，仍然递归处理子元素
+      return processChildren();
   }
 }
 
+// 处理表格的辅助函数
+function processTable(tableElement, info) {
+  let tableMarkdown = '\n';
+  const rows = [];
+  
+  // 收集所有行
+  for (let child of tableElement.childNodes) {
+    if (child.tagName?.toLowerCase() === 'tr') {
+      rows.push(child);
+    } else if (['thead', 'tbody', 'tfoot'].includes(child.tagName?.toLowerCase())) {
+      for (let grandChild of child.childNodes) {
+        if (grandChild.tagName?.toLowerCase() === 'tr') {
+          rows.push(grandChild);
+        }
+      }
+    }
+  }
+  
+  // 处理每一行
+  rows.forEach((row, rowIndex) => {
+    const cells = [];
+    for (let cell of row.childNodes) {
+      if (['th', 'td'].includes(cell.tagName?.toLowerCase())) {
+        const cellContent = convertElementToMarkdown(cell, info).trim();
+        cells.push(cellContent || ' ');
+      }
+    }
+    
+    if (cells.length > 0) {
+      tableMarkdown += '| ' + cells.join(' | ') + ' |\n';
+      
+      // 为第一行添加分隔符（表头）
+      if (rowIndex === 0) {
+        tableMarkdown += '|' + cells.map(() => ' --- ').join('|') + '|\n';
+      }
+    }
+  });
+  
+  return tableMarkdown + '\n';
+}
+
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // 使用 cors 中间件允许跨域请求
 app.use(cors({
@@ -359,8 +480,8 @@ app.post('/receive-dom', async (req, res) => {
 
 // 生成 Markdown 内容的函数
 function generateMarkdownContent(html, info, baseFilename) {
-  // 转换 HTML 到 Markdown
-  let markdownBody = simpleHtmlToMarkdown(html, info);
+  // 转换 HTML 到 Markdown - 使用改进的 jsdom 转换
+  let markdownBody = htmlToMarkdown(html, info);
   
   // 检查是否已经有一级标题
   const hasH1 = markdownBody.includes('# ');
