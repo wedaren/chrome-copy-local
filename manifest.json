@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DOM Catcher",
   "version": "1.1",
-  "description": "一键选中 DOM 元素并发送到自定义服务器。",
+  "description": "安全的 DOM 元素捕获工具，支持本地服务器连接。采用最小权限策略确保数据安全。",
   "permissions": [
     "activeTab",
     "scripting",

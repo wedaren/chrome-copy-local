@@ -127,7 +127,7 @@
 </head>
 <body>
   <div class="title">DOM Catcher</div>
-  <div class="description">配置服务器地址后，点击按钮开始选择页面元素。</div>
+  <div class="description">配置本地服务器地址后，点击按钮开始选择页面元素。当前版本仅支持 localhost 连接。</div>
   
   <div class="server-config">
     <div class="config-title">服务器配置</div>
@@ -139,6 +139,11 @@
     <div class="status-indicator">
       <div class="status-dot status-offline" id="statusDot"></div>
       <span id="statusText">未连接</span>
+    </div>
+    <div class="permission-info" id="permissionInfo" style="display: none;">
+      <small style="color: #666; font-size: 11px;">
+        🔒 外部服务器需要额外的网络权限
+      </small>
     </div>
   </div>
   
