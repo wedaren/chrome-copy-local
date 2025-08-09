@@ -62,20 +62,28 @@ async function saveServerConfig(url) {
 }
 
 // 当服务器URL输入变化时
-function onServerUrlChange() {
+async function onServerUrlChange() {
   const url = serverUrlInput.value.trim();
   if (url && isValidUrl(url)) {
-    saveServerConfig(url);
+    try {  
+      await saveServerConfig(url);  
+    } catch (error) {  
+      console.error('Failed to save server config:', error);  
+    }  
     updateStatus('offline', '未连接');
     startSelectionButton.disabled = true;
     
     // 检查是否需要显示权限提示
-    if (!isLocalUrl(url)) {
-      permissionInfo.style.display = 'block';
-      permissionInfo.innerHTML = '<small style="color: #e74c3c; font-size: 11px;">⚠️ 当前版本仅支持本地服务器连接</small>';
-    } else {
-      permissionInfo.style.display = 'none';
-    }
+    if (!isLocalUrl(url)) {  
+      const smallEl = permissionInfo.querySelector('small');  
+      if (smallEl) {  
+        smallEl.textContent = '⚠️ 当前版本仅支持本地服务器连接';  
+        smallEl.style.color = '#e74c3c';  
+      }  
+      permissionInfo.style.display = 'block';  
+    } else {  
+      permissionInfo.style.display = 'none';  
+    }  
   }
 }
 
@@ -125,7 +133,7 @@ async function testServerConnection() {
   testConnectionButton.disabled = true;
 
   try {
-    const statusUrl = url.endsWith('/') ? `${url}status` : `${url}/status`;
+    const statusUrl = new URL('status', url).href;  
     
     const response = await fetch(statusUrl, {
       method: 'GET',
