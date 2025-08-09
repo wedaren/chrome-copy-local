@@ -290,6 +290,20 @@ app.post('/receive-dom', async (req, res) => {
       <span class="info-label">Markdown文件:</span>
       <span class="info-value">${escapeHtml(markdownFilename)}</span>
     </div>
+    ${info?.linkStats ? `
+    <div class="info-item">
+      <span class="info-label">🔗 链接统计:</span>
+      <span class="info-value">
+        图片: ${info.linkStats.totalImages || 0} 个 | 
+        链接: ${info.linkStats.totalLinks || 0} 个
+        ${info.linkStats.hasBackgroundImages ? ' | 包含背景图片' : ''}
+      </span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">📍 基础URL:</span>
+      <span class="info-value">${escapeHtml(info.baseUrl || info.url)}</span>
+    </div>
+    ` : ''}
   </div>
 
   <div class="captured-element">

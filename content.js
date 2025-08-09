@@ -68,6 +68,97 @@ if (!window.hasDOMCatcher) {
     lastElement = event.target;
   };
 
+  // 2.5. 处理相对链接转绝对链接的函数
+  const convertRelativeToAbsolute = (element) => {
+    const clone = element.cloneNode(true);
+    const baseUrl = window.location.origin;
+    const currentPath = window.location.href;
+    
+    // 处理所有图片的src属性
+    const images = clone.querySelectorAll('img[src]');
+    images.forEach(img => {
+      const src = img.getAttribute('src');
+      if (src && !src.startsWith('http') && !src.startsWith('data:') && !src.startsWith('//')) {
+        try {
+          const absoluteUrl = new URL(src, currentPath).href;
+          img.setAttribute('src', absoluteUrl);
+        } catch (e) {
+          console.warn('无法转换图片链接:', src, e);
+        }
+      }
+    });
+    
+    // 处理所有链接的href属性
+    const links = clone.querySelectorAll('a[href]');
+    links.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && !href.startsWith('http') && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('#') && !href.startsWith('javascript:') && !href.startsWith('//')) {
+        try {
+          const absoluteUrl = new URL(href, currentPath).href;
+          link.setAttribute('href', absoluteUrl);
+        } catch (e) {
+          console.warn('无法转换链接:', href, e);
+        }
+      }
+    });
+    
+    // 处理CSS背景图片
+    const elementsWithBg = clone.querySelectorAll('*[style*="background"]');
+    elementsWithBg.forEach(el => {
+      const style = el.getAttribute('style');
+      if (style && style.includes('url(')) {
+        const updatedStyle = style.replace(/url\(['"]?([^'")]+)['"]?\)/g, (match, url) => {
+          if (!url.startsWith('http') && !url.startsWith('data:') && !url.startsWith('//')) {
+            try {
+              const absoluteUrl = new URL(url, currentPath).href;
+              return `url('${absoluteUrl}')`;
+            } catch (e) {
+              console.warn('无法转换CSS背景图片:', url, e);
+              return match;
+            }
+          }
+          return match;
+        });
+        el.setAttribute('style', updatedStyle);
+      }
+    });
+    
+    // 处理其他可能包含URL的属性
+    const urlAttributes = ['srcset', 'data-src', 'data-original', 'data-lazy'];
+    urlAttributes.forEach(attr => {
+      const elements = clone.querySelectorAll(`[${attr}]`);
+      elements.forEach(el => {
+        const value = el.getAttribute(attr);
+        if (value && !value.startsWith('http') && !value.startsWith('data:') && !value.startsWith('//')) {
+          try {
+            // 处理srcset可能包含多个URL的情况
+            if (attr === 'srcset') {
+              const srcsetValue = value.replace(/(\S+)(\s+\S+)?/g, (match, url, descriptor) => {
+                if (!url.startsWith('http') && !url.startsWith('data:') && !url.startsWith('//')) {
+                  try {
+                    const absoluteUrl = new URL(url, currentPath).href;
+                    return absoluteUrl + (descriptor || '');
+                  } catch (e) {
+                    return match;
+                  }
+                }
+                return match;
+              });
+              el.setAttribute(attr, srcsetValue);
+            } else {
+              const absoluteUrl = new URL(value, currentPath).href;
+              el.setAttribute(attr, absoluteUrl);
+            }
+          } catch (e) {
+            console.warn(`无法转换${attr}属性:`, value, e);
+          }
+        }
+      });
+    });
+    
+    return clone;
+  };
+
   // 3. 监听点击，捕获并发送数据
   const clickHandler = async (event) => {
     // 阻止默认行为，例如链接跳转
@@ -75,7 +166,10 @@ if (!window.hasDOMCatcher) {
     event.stopPropagation();
 
     const targetElement = event.target;
-    const elementHTML = targetElement.outerHTML;
+    
+    // 处理相对链接转换为绝对链接
+    const processedElement = convertRelativeToAbsolute(targetElement);
+    const elementHTML = processedElement.outerHTML;
     
     // 获取元素的基本信息
     const text = targetElement.textContent || '';
@@ -85,8 +179,15 @@ if (!window.hasDOMCatcher) {
       id: targetElement.id,
       textContent: text.length > 100 ? `${text.substring(0, 100)}...` : text,
       url: window.location.href,
-      pageTitle: document.title || '', // 添加页面标题
-      timestamp: new Date().toISOString()
+      baseUrl: window.location.origin,
+      pageTitle: document.title || '',
+      timestamp: new Date().toISOString(),
+      // 统计转换的链接信息
+      linkStats: {
+        totalImages: processedElement.querySelectorAll('img').length,
+        totalLinks: processedElement.querySelectorAll('a[href]').length,
+        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background"]').length > 0
+      }
     };
 
     console.log('捕获到元素:', elementInfo);
