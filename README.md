@@ -12,6 +12,18 @@
 - **本地存储**: 默认本地服务器，确保隐私安全
 - **友好界面**: 美观的通知提示和保存的HTML文件界面
 
+## 🤖 AI 代码辅助
+
+本项目集成了 **Gemini Code Assist** 智能代码审查功能：
+
+- **🔍 自动代码审查**: PR 创建时自动进行代码质量检查
+- **📝 智能摘要**: 自动生成代码变更摘要和影响分析  
+- **🇨🇳 中文支持**: 使用中文进行代码审查和建议
+- **🛡️ 安全检查**: 专注 Chrome 插件安全性和最佳实践
+- **📋 风格检查**: 确保代码符合项目编码规范
+
+> 详细配置和使用说明请参考 [GEMINI-ASSIST.md](GEMINI-ASSIST.md)
+
 ## ✨ v1.1 新功能
 
 - **🔧 自定义服务器配置**: 在扩展弹窗中配置任意服务器地址
@@ -31,6 +43,10 @@ chrome-copy-local/
 ├── server.js             # Node.js本地服务器
 ├── package.json          # Node.js项目配置
 ├── README.md             # 项目说明文档
+├── GEMINI-ASSIST.md      # Gemini Code Assist 使用说明
+├── .gemini/              # Gemini AI 配置目录
+│   ├── config.yaml       # Gemini 审查配置
+│   └── styleguide.md     # 项目编码风格指南
 └── captured/             # 保存捕获元素的目录(自动创建)
 ```
 
