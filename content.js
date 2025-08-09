@@ -68,89 +68,82 @@ if (!window.hasDOMCatcher) {
     lastElement = event.target;
   };
 
-  // 2.5. 处理相对链接转绝对链接的函数
+  // 2.5. 处理相对链接转绝对链接的函数 - 优化版本（单次遍历）
   const convertRelativeToAbsolute = (element) => {
     const clone = element.cloneNode(true);
-    const baseUrl = window.location.origin;
     const currentPath = window.location.href;
     
-    // 处理所有图片的src属性
-    const images = clone.querySelectorAll('img[src]');
-    images.forEach(img => {
-      const src = img.getAttribute('src');
-      if (src && !src.startsWith('http') && !src.startsWith('data:') && !src.startsWith('//')) {
-        try {
-          const absoluteUrl = new URL(src, currentPath).href;
-          img.setAttribute('src', absoluteUrl);
-        } catch (e) {
-          console.warn('无法转换图片链接:', src, e);
+    // 辅助函数：检查URL是否需要转换
+    const needsConversion = (url) => {
+      return url && 
+             !url.startsWith('http') && 
+             !url.startsWith('data:') && 
+             !url.startsWith('//') && 
+             !url.startsWith('mailto:') && 
+             !url.startsWith('tel:') && 
+             !url.startsWith('#') && 
+             !url.startsWith('javascript:');
+    };
+    
+    // 辅助函数：安全地转换URL
+    const convertUrl = (url, context = '') => {
+      try {
+        return new URL(url, currentPath).href;
+      } catch (e) {
+        console.warn(`无法转换${context}:`, url, e);
+        return url; // 返回原始URL
+      }
+    };
+    
+    // 单次遍历处理所有元素
+    const allElements = clone.querySelectorAll('*');
+    allElements.forEach(el => {
+      // 处理 img 标签的 src 属性
+      if (el.tagName === 'IMG') {
+        const src = el.getAttribute('src');
+        if (needsConversion(src)) {
+          el.setAttribute('src', convertUrl(src, 'img src'));
         }
       }
-    });
-    
-    // 处理所有链接的href属性
-    const links = clone.querySelectorAll('a[href]');
-    links.forEach(link => {
-      const href = link.getAttribute('href');
-      if (href && !href.startsWith('http') && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('#') && !href.startsWith('javascript:') && !href.startsWith('//')) {
-        try {
-          const absoluteUrl = new URL(href, currentPath).href;
-          link.setAttribute('href', absoluteUrl);
-        } catch (e) {
-          console.warn('无法转换链接:', href, e);
+      
+      // 处理 a 标签的 href 属性
+      if (el.tagName === 'A') {
+        const href = el.getAttribute('href');
+        if (needsConversion(href)) {
+          el.setAttribute('href', convertUrl(href, 'a href'));
         }
       }
-    });
-    
-    // 处理CSS背景图片
-    const elementsWithBg = clone.querySelectorAll('*[style*="background"]');
-    elementsWithBg.forEach(el => {
+      
+      // 处理 CSS 背景图片
       const style = el.getAttribute('style');
       if (style && style.includes('url(')) {
         const updatedStyle = style.replace(/url\(['"]?([^'")]+)['"]?\)/g, (match, url) => {
-          if (!url.startsWith('http') && !url.startsWith('data:') && !url.startsWith('//')) {
-            try {
-              const absoluteUrl = new URL(url, currentPath).href;
-              return `url('${absoluteUrl}')`;
-            } catch (e) {
-              console.warn('无法转换CSS背景图片:', url, e);
-              return match;
-            }
+          if (needsConversion(url)) {
+            const absoluteUrl = convertUrl(url, 'CSS background');
+            return `url('${absoluteUrl}')`;
           }
           return match;
         });
         el.setAttribute('style', updatedStyle);
       }
-    });
-    
-    // 处理其他可能包含URL的属性
-    const urlAttributes = ['srcset', 'data-src', 'data-original', 'data-lazy'];
-    urlAttributes.forEach(attr => {
-      const elements = clone.querySelectorAll(`[${attr}]`);
-      elements.forEach(el => {
+      
+      // 处理其他URL属性
+      const urlAttributes = ['srcset', 'data-src', 'data-original', 'data-lazy'];
+      urlAttributes.forEach(attr => {
         const value = el.getAttribute(attr);
-        if (value && !value.startsWith('http') && !value.startsWith('data:') && !value.startsWith('//')) {
-          try {
+        if (needsConversion(value)) {
+          if (attr === 'srcset') {
             // 处理srcset可能包含多个URL的情况
-            if (attr === 'srcset') {
-              const srcsetValue = value.replace(/(\S+)(\s+\S+)?/g, (match, url, descriptor) => {
-                if (!url.startsWith('http') && !url.startsWith('data:') && !url.startsWith('//')) {
-                  try {
-                    const absoluteUrl = new URL(url, currentPath).href;
-                    return absoluteUrl + (descriptor || '');
-                  } catch (e) {
-                    return match;
-                  }
-                }
-                return match;
-              });
-              el.setAttribute(attr, srcsetValue);
-            } else {
-              const absoluteUrl = new URL(value, currentPath).href;
-              el.setAttribute(attr, absoluteUrl);
-            }
-          } catch (e) {
-            console.warn(`无法转换${attr}属性:`, value, e);
+            const srcsetValue = value.replace(/(\S+)(\s+\S+)?/g, (match, url, descriptor) => {
+              if (needsConversion(url)) {
+                const absoluteUrl = convertUrl(url, `srcset ${attr}`);
+                return absoluteUrl + (descriptor || '');
+              }
+              return match;
+            });
+            el.setAttribute(attr, srcsetValue);
+          } else {
+            el.setAttribute(attr, convertUrl(value, attr));
           }
         }
       });
