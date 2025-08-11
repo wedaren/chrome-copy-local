@@ -210,8 +210,14 @@ if (!window.hasDOMCatcher) {
       
       if (response.ok) {
         const result = await response.json();
-        const message = `✅ 成功生成文件！\n📄 HTML: ${result.files?.html?.filename}\n📝 Markdown: ${result.files?.markdown?.filename}`;
-        showNotification(message, 'success');
+        let message = `✅ 成功生成文件！\n📄 HTML: ${result.files?.html?.filename}\n📝 Markdown: ${result.files?.markdown?.filename}`;
+        
+        // 如果有查看链接，添加到消息中
+        if (result.files?.html?.viewUrl) {
+          message += `\n\n👁️ 点击查看: ${result.files.html.viewUrl}`;
+        }
+        
+        showNotification(message, 'success', result.files?.html?.viewUrl);
         console.log('成功发送到服务器！', result);
       } else {
         throw new Error(`服务器返回错误: ${response.status}`);
@@ -231,14 +237,43 @@ if (!window.hasDOMCatcher) {
   };
 
   // 4. 显示通知函数
-  const showNotification = (message, type = 'info') => {
+  const showNotification = (message, type = 'info', viewUrl = null) => {
     const notification = document.createElement('div');
     notification.className = `dom-catcher-notification ${type}`;
-    notification.textContent = message;
+    
+    if (viewUrl && type === 'success') {
+      // 为成功消息创建可点击的通知
+      const textPart = message.split('\n\n👁️')[0]; // 分离文本和链接部分
+      const textDiv = document.createElement('div');
+      textDiv.textContent = textPart;
+      
+      const linkDiv = document.createElement('div');
+      linkDiv.style.marginTop = '8px';
+      linkDiv.style.borderTop = '1px solid rgba(255,255,255,0.3)';
+      linkDiv.style.paddingTop = '8px';
+      
+      const linkButton = document.createElement('a');
+      linkButton.textContent = '👁️ 点击查看 HTML 文件';
+      linkButton.href = viewUrl;
+      linkButton.target = '_blank';
+      linkButton.style.cssText = `
+        color: white;
+        text-decoration: underline;
+        cursor: pointer;
+        font-weight: bold;
+      `;
+      
+      linkDiv.appendChild(linkButton);
+      notification.appendChild(textDiv);
+      notification.appendChild(linkDiv);
+    } else {
+      notification.textContent = message;
+    }
+    
     document.body.appendChild(notification);
 
-    // 5秒后自动移除（成功消息稍长展示）
-    const timeout = type === 'success' ? 5000 : 3000;
+    // 成功消息延长展示时间
+    const timeout = type === 'success' ? 8000 : 3000;
     setTimeout(() => {
       if (notification.parentNode) {
         notification.parentNode.removeChild(notification);

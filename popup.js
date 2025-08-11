@@ -5,6 +5,7 @@ const DEFAULT_SERVER_URL = 'http://localhost:3000';
 let serverUrlInput;
 let testConnectionButton;
 let startSelectionButton;
+let viewFilesButton;
 let statusDot;
 let statusText;
 let permissionInfo;
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   serverUrlInput = document.getElementById('serverUrl');
   testConnectionButton = document.getElementById('testConnection');
   startSelectionButton = document.getElementById('startSelection');
+  viewFilesButton = document.getElementById('viewFiles');
   statusDot = document.getElementById('statusDot');
   statusText = document.getElementById('statusText');
   permissionInfo = document.getElementById('permissionInfo');
@@ -33,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   serverUrlInput.addEventListener('change', onServerUrlChange);
   testConnectionButton.addEventListener('click', testServerConnection);
   startSelectionButton.addEventListener('click', startSelection);
+  viewFilesButton.addEventListener('click', openFileManager);
 
   // 自动测试连接
   await testServerConnection();
@@ -187,8 +190,10 @@ function updateStatus(status, message) {
   // 更新按钮状态
   if (status === 'online') {
     startSelectionButton.disabled = false;
+    viewFilesButton.disabled = false;
   } else {
     startSelectionButton.disabled = true;
+    viewFilesButton.disabled = true;
   }
 }
 
@@ -230,4 +235,20 @@ async function startSelection() {
 // 向页面注入服务器配置
 function injectServerConfig(serverUrl) {
   window.DOM_CATCHER_SERVER_URL = serverUrl;
+}
+
+// 打开文件管理器
+async function openFileManager() {
+  if (!serverStatus.online) {
+    updateStatus('offline', '请先测试服务器连接');
+    return;
+  }
+
+  try {
+    const manageUrl = new URL('manage', serverStatus.url).href;
+    await chrome.tabs.create({ url: manageUrl });
+  } catch (error) {
+    console.error('打开文件管理器失败:', error);
+    updateStatus('offline', '打开文件管理器失败');
+  }
 }

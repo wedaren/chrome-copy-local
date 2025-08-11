@@ -280,6 +280,16 @@ app.use(express.json({ limit: '50mb' }));
 // 确保 'captured' 目录存在
 const outputDir = path.join(__dirname, 'captured');
 
+// 提供静态文件服务，用于查看保存的 HTML 文件
+app.use('/view', (req, res, next) => {
+  // 设置严格的CSP策略，禁止执行任何脚本，防止XSS攻击
+  res.setHeader('Content-Security-Policy', "script-src 'none'; object-src 'none';");
+  next();
+}, express.static(outputDir));
+
+// 提供 public 目录的静态文件服务（用于管理界面等）
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 // HTML转义函数，防止XSS攻击
 function escapeHtml(unsafe) {
   if (!unsafe) return 'N/A';
@@ -450,8 +460,12 @@ app.post('/receive-dom', async (req, res) => {
       elementInfo: info,
       success: true
     };
+
+    // 动态获取 baseUrl，避免硬编码 localhost
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     
     console.log('✅ 成功保存元素 (HTML + Markdown):', logInfo);
+    
     
     res.status(200).json({
       success: true,
@@ -459,7 +473,8 @@ app.post('/receive-dom', async (req, res) => {
       files: {
         html: {
           filename: htmlFilename,
-          filepath: htmlFilepath
+          filepath: htmlFilepath,
+          viewUrl: `${baseUrl}/view/${htmlFilename}`
         },
         markdown: {
           filename: markdownFilename,
@@ -533,6 +548,7 @@ app.get('/files', async (req, res) => {
     const files = await fs.readdir(outputDir);
     const htmlFiles = files.filter(file => file.endsWith('.html'));
     const markdownFiles = files.filter(file => file.endsWith('.md'));
+    const baseUrl = `${req.protocol}://${req.get('host')}`;  
     
     const fileDetails = await Promise.all(
       htmlFiles.map(async (file) => {
@@ -556,7 +572,8 @@ app.get('/files', async (req, res) => {
             size: stats.size,
             created: stats.birthtime,
             modified: stats.mtime,
-            exists: true
+            exists: true,
+            viewUrl: `${baseUrl}/view/${file}`
           },
           markdown: markdownExists ? {
             name: markdownFile,
@@ -576,7 +593,8 @@ app.get('/files', async (req, res) => {
       count: fileDetails.length,
       htmlFiles: htmlFiles.length,
       markdownFiles: markdownFiles.length,
-      files: fileDetails.sort((a, b) => b.html.created - a.html.created)
+      files: fileDetails.sort((a, b) => b.html.created - a.html.created),
+      baseUrl: baseUrl
     });
   } catch (error) {
     res.status(500).json({
@@ -585,6 +603,23 @@ app.get('/files', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// 添加文件管理界面
+app.get('/manage', (req, res) => {
+  
+  // 使用静态 HTML 文件提供服务，提高代码可维护性
+  const managePath = path.join(__dirname, 'public', 'manage.html');
+  res.sendFile(managePath, (err) => {
+    if (err) {
+      console.error('发送文件管理页面失败:', err);
+      res.status(500).json({
+        success: false,
+        message: '无法加载文件管理页面',
+        error: err.message
+      });
+    }
+  });
 });
 
 // 启动服务器
@@ -597,8 +632,9 @@ const startServer = async () => {
 📁 保存目录: ${outputDir}
 🔍 状态检查: http://localhost:${port}/status
 📋 文件列表: http://localhost:${port}/files
+🎯 文件管理: http://localhost:${port}/manage
 
-🎯 新功能: 自动生成 HTML 和 Markdown 文件
+🎯 新功能: 支持查看 HTML 文件
 准备接收来自 Chrome 插件的 DOM 元素...
     `);
   });
