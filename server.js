@@ -280,6 +280,9 @@ app.use(express.json({ limit: '50mb' }));
 // 确保 'captured' 目录存在
 const outputDir = path.join(__dirname, 'captured');
 
+// 提供静态文件服务，用于查看保存的 HTML 文件
+app.use('/view', express.static(outputDir));
+
 // HTML转义函数，防止XSS攻击
 function escapeHtml(unsafe) {
   if (!unsafe) return 'N/A';
@@ -453,13 +456,16 @@ app.post('/receive-dom', async (req, res) => {
     
     console.log('✅ 成功保存元素 (HTML + Markdown):', logInfo);
     
+    const baseUrl = `http://localhost:${port}`;
+    
     res.status(200).json({
       success: true,
       message: `成功保存文件: ${htmlFilename} 和 ${markdownFilename}`,
       files: {
         html: {
           filename: htmlFilename,
-          filepath: htmlFilepath
+          filepath: htmlFilepath,
+          viewUrl: `${baseUrl}/view/${htmlFilename}`
         },
         markdown: {
           filename: markdownFilename,
@@ -533,6 +539,7 @@ app.get('/files', async (req, res) => {
     const files = await fs.readdir(outputDir);
     const htmlFiles = files.filter(file => file.endsWith('.html'));
     const markdownFiles = files.filter(file => file.endsWith('.md'));
+    const baseUrl = `http://localhost:${port}`;
     
     const fileDetails = await Promise.all(
       htmlFiles.map(async (file) => {
@@ -556,7 +563,8 @@ app.get('/files', async (req, res) => {
             size: stats.size,
             created: stats.birthtime,
             modified: stats.mtime,
-            exists: true
+            exists: true,
+            viewUrl: `${baseUrl}/view/${file}`
           },
           markdown: markdownExists ? {
             name: markdownFile,
@@ -576,7 +584,8 @@ app.get('/files', async (req, res) => {
       count: fileDetails.length,
       htmlFiles: htmlFiles.length,
       markdownFiles: markdownFiles.length,
-      files: fileDetails.sort((a, b) => b.html.created - a.html.created)
+      files: fileDetails.sort((a, b) => b.html.created - a.html.created),
+      baseUrl: baseUrl
     });
   } catch (error) {
     res.status(500).json({
@@ -585,6 +594,289 @@ app.get('/files', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// 添加文件管理界面
+app.get('/manage', (req, res) => {
+  const manageHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM Catcher - 文件管理</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      color: #2c3e50;
+      font-size: 2.5rem;
+      font-weight: 300;
+    }
+    .header .subtitle {
+      color: #7f8c8d;
+      margin: 10px 0 0 0;
+      font-size: 1.1rem;
+    }
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      flex: 1;
+      min-width: 200px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #3498db;
+      display: block;
+    }
+    .stat-label {
+      color: #7f8c8d;
+      margin-top: 5px;
+    }
+    .files-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .files-header {
+      background: #f8f9fa;
+      padding: 20px 30px;
+      border-bottom: 1px solid #dee2e6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .files-header h2 {
+      margin: 0;
+      color: #2c3e50;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .refresh-btn {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .refresh-btn:hover {
+      background: #2980b9;
+    }
+    .files-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .file-item {
+      padding: 20px 30px;
+      border-bottom: 1px solid #f1f3f4;
+      transition: background 0.2s;
+    }
+    .file-item:hover {
+      background: #f8f9fa;
+    }
+    .file-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .file-name {
+      font-weight: 600;
+      color: #2c3e50;
+      font-size: 1.1rem;
+    }
+    .file-time {
+      color: #7f8c8d;
+      font-size: 0.9rem;
+    }
+    .file-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn-primary {
+      background: #3498db;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #2980b9;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: #95a5a6;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background: #7f8c8d;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #7f8c8d;
+    }
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: #e74c3c;
+    }
+    @media (max-width: 768px) {
+      .stats {
+        flex-direction: column;
+      }
+      .file-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .file-actions {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📁 DOM Catcher</h1>
+      <p class="subtitle">文件管理中心</p>
+    </div>
+
+    <div class="stats" id="stats">
+      <div class="stat-card">
+        <span class="stat-number" id="totalFiles">-</span>
+        <div class="stat-label">HTML 文件</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="totalMarkdown">-</span>
+        <div class="stat-label">Markdown 文件</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="totalPairs">-</span>
+        <div class="stat-label">配对文件</div>
+      </div>
+    </div>
+
+    <div class="files-container">
+      <div class="files-header">
+        <h2>📋 已捕获的文件</h2>
+        <button class="refresh-btn" onclick="loadFiles()">🔄 刷新</button>
+      </div>
+      <div class="files-list" id="filesList">
+        <div class="loading">正在加载文件列表...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadFiles() {
+      const filesList = document.getElementById('filesList');
+      const totalFilesEl = document.getElementById('totalFiles');
+      const totalMarkdownEl = document.getElementById('totalMarkdown');
+      const totalPairsEl = document.getElementById('totalPairs');
+      
+      filesList.innerHTML = '<div class="loading">正在加载文件列表...</div>';
+      
+      try {
+        const response = await fetch('/files');
+        const data = await response.json();
+        
+        if (data.success) {
+          // 更新统计数据
+          totalFilesEl.textContent = data.htmlFiles || 0;
+          totalMarkdownEl.textContent = data.markdownFiles || 0;
+          totalPairsEl.textContent = data.count || 0;
+          
+          if (data.files && data.files.length > 0) {
+            filesList.innerHTML = data.files.map(file => {
+              const createdDate = new Date(file.html.created).toLocaleString('zh-CN');
+              return \`
+                <div class="file-item">
+                  <div class="file-info">
+                    <div class="file-name">📄 \${file.html.name}</div>
+                    <div class="file-time">创建于 \${createdDate}</div>
+                  </div>
+                  <div class="file-actions">
+                    <a href="\${file.html.viewUrl}" target="_blank" class="btn btn-primary">
+                      👁️ 查看 HTML
+                    </a>
+                    \${file.markdown.exists ? 
+                      \`<a href="/view/\${file.markdown.name}" target="_blank" class="btn btn-secondary">
+                        📝 查看 Markdown
+                      </a>\` : 
+                      '<span class="btn btn-secondary" style="opacity: 0.5;">📝 无 Markdown</span>'
+                    }
+                  </div>
+                </div>
+              \`;
+            }).join('');
+          } else {
+            filesList.innerHTML = '<div class="loading">暂无捕获的文件</div>';
+          }
+        } else {
+          throw new Error(data.message || '加载失败');
+        }
+      } catch (error) {
+        console.error('加载文件列表失败:', error);
+        filesList.innerHTML = \`<div class="error">❌ 加载失败: \${error.message}</div>\`;
+      }
+    }
+    
+    // 页面加载完成后自动加载文件列表
+    document.addEventListener('DOMContentLoaded', loadFiles);
+    
+    // 每30秒自动刷新一次
+    setInterval(loadFiles, 30000);
+  </script>
+</body>
+</html>`;
+  
+  res.send(manageHtml);
 });
 
 // 启动服务器
@@ -597,8 +889,9 @@ const startServer = async () => {
 📁 保存目录: ${outputDir}
 🔍 状态检查: http://localhost:${port}/status
 📋 文件列表: http://localhost:${port}/files
+🎯 文件管理: http://localhost:${port}/manage
 
-🎯 新功能: 自动生成 HTML 和 Markdown 文件
+🎯 新功能: 支持查看 HTML 文件
 准备接收来自 Chrome 插件的 DOM 元素...
     `);
   });
