@@ -820,6 +820,17 @@ app.get('/manage', (req, res) => {
   </div>
 
   <script>
+    // HTML 转义函数，防止 XSS 攻击
+    function escapeHtml(unsafe) {
+      if (!unsafe) return '';
+      return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
     async function loadFiles() {
       const filesList = document.getElementById('filesList');
       const totalFilesEl = document.getElementById('totalFiles');
@@ -841,18 +852,24 @@ app.get('/manage', (req, res) => {
           if (data.files && data.files.length > 0) {
             filesList.innerHTML = data.files.map(file => {
               const createdDate = new Date(file.html.created).toLocaleString('zh-CN');
+              // 对所有用户输入进行 HTML 转义
+              const safeHtmlName = escapeHtml(file.html.name);
+              const safeMarkdownName = escapeHtml(file.markdown.name);
+              const safeViewUrl = escapeHtml(file.html.viewUrl);
+              const safeCreatedDate = escapeHtml(createdDate);
+              
               return \`
                 <div class="file-item">
                   <div class="file-info">
-                    <div class="file-name">📄 \${file.html.name}</div>
-                    <div class="file-time">创建于 \${createdDate}</div>
+                    <div class="file-name">📄 \${safeHtmlName}</div>
+                    <div class="file-time">创建于 \${safeCreatedDate}</div>
                   </div>
                   <div class="file-actions">
-                    <a href="\${file.html.viewUrl}" target="_blank" class="btn btn-primary">
+                    <a href="\${safeViewUrl}" target="_blank" class="btn btn-primary">
                       👁️ 查看 HTML
                     </a>
                     \${file.markdown.exists ? 
-                      \`<a href="/view/\${file.markdown.name}" target="_blank" class="btn btn-secondary">
+                      \`<a href="/view/\${safeMarkdownName}" target="_blank" class="btn btn-secondary">
                         📝 查看 Markdown
                       </a>\` : 
                       '<span class="btn btn-secondary" style="opacity: 0.5;">📝 无 Markdown</span>'
@@ -869,7 +886,8 @@ app.get('/manage', (req, res) => {
         }
       } catch (error) {
         console.error('加载文件列表失败:', error);
-        filesList.innerHTML = \`<div class="error">❌ 加载失败: \${error.message}</div>\`;
+        const safeErrorMessage = escapeHtml(error.message);
+        filesList.innerHTML = \`<div class="error">❌ 加载失败: \${safeErrorMessage}</div>\`;
       }
     }
     
