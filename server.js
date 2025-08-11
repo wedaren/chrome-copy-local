@@ -281,7 +281,11 @@ app.use(express.json({ limit: '50mb' }));
 const outputDir = path.join(__dirname, 'captured');
 
 // 提供静态文件服务，用于查看保存的 HTML 文件
-app.use('/view', express.static(outputDir));
+app.use('/view', (req, res, next) => {
+  // 设置严格的CSP策略，禁止执行任何脚本，防止XSS攻击
+  res.setHeader('Content-Security-Policy', "script-src 'none'; object-src 'none';");
+  next();
+}, express.static(outputDir));
 
 // HTML转义函数，防止XSS攻击
 function escapeHtml(unsafe) {
