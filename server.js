@@ -457,10 +457,12 @@ app.post('/receive-dom', async (req, res) => {
       elementInfo: info,
       success: true
     };
+
+    // 动态获取 baseUrl，避免硬编码 localhost
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     
     console.log('✅ 成功保存元素 (HTML + Markdown):', logInfo);
     
-    const baseUrl = `http://localhost:${port}`;
     
     res.status(200).json({
       success: true,
@@ -543,7 +545,7 @@ app.get('/files', async (req, res) => {
     const files = await fs.readdir(outputDir);
     const htmlFiles = files.filter(file => file.endsWith('.html'));
     const markdownFiles = files.filter(file => file.endsWith('.md'));
-    const baseUrl = `http://localhost:${port}`;
+    const baseUrl = `${req.protocol}://${req.get('host')}`;  
     
     const fileDetails = await Promise.all(
       htmlFiles.map(async (file) => {
