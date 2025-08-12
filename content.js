@@ -68,9 +68,135 @@ if (!window.hasDOMCatcher) {
     lastElement = event.target;
   };
 
-  // 2.5. 处理相对链接转绝对链接的函数 - 优化版本（单次遍历）
+  // 2.5. 样式提取相关函数
+  
+  // 重要样式属性列表 - 这些属性对视觉效果最重要
+  const IMPORTANT_STYLE_PROPERTIES = [
+    // 布局相关
+    'display', 'position', 'top', 'left', 'right', 'bottom',
+    'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+    'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'border', 'border-width', 'border-style', 'border-color',
+    'border-top', 'border-right', 'border-bottom', 'border-left',
+    'border-radius', 'box-sizing', 'overflow', 'overflow-x', 'overflow-y',
+    'float', 'clear', 'z-index',
+    
+    // 字体和文本相关
+    'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
+    'line-height', 'text-align', 'text-decoration', 'text-transform',
+    'text-indent', 'text-shadow', 'letter-spacing', 'word-spacing',
+    'color', 'white-space', 'word-wrap', 'word-break',
+    
+    // 背景相关
+    'background', 'background-color', 'background-image', 'background-repeat',
+    'background-position', 'background-size', 'background-attachment',
+    
+    // 视觉效果
+    'opacity', 'visibility', 'transform', 'transform-origin',
+    'box-shadow', 'text-shadow', 'filter',
+    
+    // 弹性布局
+    'flex', 'flex-direction', 'flex-wrap', 'flex-basis', 'flex-grow', 'flex-shrink',
+    'justify-content', 'align-items', 'align-self', 'align-content',
+    
+    // 网格布局
+    'grid', 'grid-template-columns', 'grid-template-rows', 'grid-gap',
+    'grid-column', 'grid-row'
+  ];
+
+  // 检查样式值是否为有意义的非默认值
+  const isSignificantStyleValue = (property, value, element) => {
+    if (['font-family'].includes(property)){
+      return false;
+    }
+
+    if (!value || value === '' || value === 'auto' || value === 'none' || value === 'normal') {
+      return false;
+    }
+    
+    // 检查一些常见的默认值
+    const defaultValues = {
+      'margin': '0px',
+      'margin-top': '0px', 'margin-right': '0px', 'margin-bottom': '0px', 'margin-left': '0px',
+      'padding': '0px',
+      'padding-top': '0px', 'padding-right': '0px', 'padding-bottom': '0px', 'padding-left': '0px',
+      'border-width': '0px',
+      'opacity': '1',
+      'font-weight': '400',
+      'text-decoration': 'none solid rgb(0, 0, 0)',
+      'text-align': 'start',
+      'position': 'static',
+      'display': element.tagName === 'DIV' ? 'block' : (element.tagName === 'SPAN' ? 'inline' : ''),
+      'background-color': 'rgba(0, 0, 0, 0)',
+      'color': 'rgb(0, 0, 0)'
+    };
+    
+    return value !== defaultValues[property];
+  };
+
+  // 提取并内联样式到元素
+  const extractAndInlineStyles = (element, clone) => {
+    try {
+      const elementsToProcess = [element, ...element.querySelectorAll('*')];
+      const cloneElementsToProcess = [clone, ...clone.querySelectorAll('*')];
+      let processedCount = 0;
+      
+      elementsToProcess.forEach((el,index) => {
+        try {
+          const cloneEl = cloneElementsToProcess[index];
+          // 获取计算后的样式
+          const computedStyle = window.getComputedStyle(el);
+          const inlineStyles = [];
+          
+          // // 保存现有的内联样式
+          // const existingStyle = el.getAttribute('style') || '';
+          // if (existingStyle) {
+          //   inlineStyles.push(existingStyle);
+          // }
+          
+          // 遍历重要样式属性
+          IMPORTANT_STYLE_PROPERTIES.forEach(property => {
+            const value = computedStyle.getPropertyValue(property);
+            if (isSignificantStyleValue(property, value, el)) {
+              inlineStyles.push(`${property}: ${value}`);
+            }
+          });
+          
+          // 应用内联样式
+          if (inlineStyles.length > 0) {
+            // 去重和合并样式
+            const styleString = inlineStyles.join('; ');
+            cloneEl.setAttribute('style', styleString);
+          }
+          
+          // 删除 class和id属性
+          cloneEl.removeAttribute('class');
+          cloneEl.removeAttribute('id');
+
+          processedCount++;
+        } catch (err) {
+          console.warn('处理元素样式时出错:', err, cloneEl);
+        }
+      });
+      
+      console.log(`✅ 样式提取完成，处理了 ${processedCount} 个元素`);
+      return element;
+      
+    } catch (error) {
+      console.error('样式提取过程中出现错误:', error);
+      // 如果样式提取失败，返回原元素以保证基本功能
+      return element;
+    }
+  };
+
+  // 处理相对链接转绝对链接的函数 - 优化版本（单次遍历）
   const convertRelativeToAbsolute = (element) => {
     const clone = element.cloneNode(true);
+    // 先提取并内联样式
+    console.log('🎨 开始提取样式...');
+    extractAndInlineStyles(element,clone);
+
     const currentPath = window.location.href;
     
     // 辅助函数：检查URL是否需要转换
@@ -94,6 +220,10 @@ if (!window.hasDOMCatcher) {
         return url; // 返回原始URL
       }
     };
+    
+    
+    // 然后处理链接转换
+    console.log('🔗 开始转换链接...');
     
     // 单次遍历处理所有元素
     const elementsToProcess = [clone, ...clone.querySelectorAll('*')];
@@ -175,11 +305,12 @@ if (!window.hasDOMCatcher) {
       baseUrl: window.location.origin,
       pageTitle: document.title || '',
       timestamp: new Date().toISOString(),
-      // 统计转换的链接信息
+      // 统计转换的链接信息和样式信息
       linkStats: {
         totalImages: processedElement.querySelectorAll('img[src]').length,  
         totalLinks: processedElement.querySelectorAll('a[href]').length,
-        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background-image"]').length > 0
+        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background-image"]').length > 0,
+        styledElements: processedElement.querySelectorAll('*[style]').length
       }
     };
 
@@ -306,5 +437,5 @@ if (!window.hasDOMCatcher) {
   document.addEventListener('keydown', escapeHandler);
   
   // 显示开始提示
-  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n现在会同时生成 HTML 和 Markdown 文件');
+  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n✨ 新功能：自动提取并保留样式\n📝 同时生成 HTML 和 Markdown 文件');
 }
