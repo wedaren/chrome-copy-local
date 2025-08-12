@@ -123,7 +123,13 @@ if (!window.hasDOMCatcher) {
       'text-decoration': 'none solid rgb(0, 0, 0)',
       'text-align': 'start',
       'position': 'static',
-      'display': element.tagName === 'DIV' ? 'block' : (element.tagName === 'SPAN' ? 'inline' : ''),
+      'display': (() => {
+      const blockTags = ['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'SECTION', 'ARTICLE', 'ASIDE', 'FOOTER', 'HEADER', 'NAV', 'MAIN'];
+      const inlineTags = ['SPAN', 'A', 'STRONG', 'EM', 'B', 'I', 'CODE'];
+      if (blockTags.includes(element.tagName)) return 'block';
+      if (inlineTags.includes(element.tagName)) return 'inline';
+      return '';
+      })(),
       'background-color': 'rgba(0, 0, 0, 0)',
       'color': 'rgb(0, 0, 0)'
     };
@@ -288,11 +294,6 @@ if (!window.hasDOMCatcher) {
           const computedStyle = window.getComputedStyle(el);
           const inlineStyles = [];
           
-          // // 保存现有的内联样式
-          // const existingStyle = el.getAttribute('style') || '';
-          // if (existingStyle) {
-          //   inlineStyles.push(existingStyle);
-          // }
           
           // 遍历重要样式属性
           IMPORTANT_STYLE_PROPERTIES.forEach(property => {
@@ -350,12 +351,12 @@ if (!window.hasDOMCatcher) {
         console.log(`🎬 处理了 ${animatedElementsCount} 个动画元素`);
       }
       
-      return element;
+      return clone;
       
     } catch (error) {
       console.error('样式提取过程中出现错误:', error);
       // 如果样式提取失败，返回原元素以保证基本功能
-      return element;
+      return clone;
     }
   };
 
