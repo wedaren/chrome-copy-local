@@ -434,6 +434,9 @@ app.post('/receive-dom', async (req, res) => {
       <span class="info-label">🎨 样式统计:</span>
       <span class="info-value">
         ${info.linkStats.styledElements || 0} 个元素包含内联样式
+        ${info.linkStats.pseudoElements ? ` | ${info.linkStats.pseudoElements} 个伪元素` : ''}
+        ${info.linkStats.animatedElements ? ` | ${info.linkStats.animatedElements} 个动画元素` : ''}
+        ${info.linkStats.hasKeyframes ? ' | 包含关键帧动画' : ''}
       </span>
     </div>
     <div class="info-item">

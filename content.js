@@ -107,10 +107,6 @@ if (!window.hasDOMCatcher) {
 
   // 检查样式值是否为有意义的非默认值
   const isSignificantStyleValue = (property, value, element) => {
-    if (['font-family'].includes(property)){
-      return false;
-    }
-
     if (!value || value === '' || value === 'auto' || value === 'none' || value === 'normal') {
       return false;
     }
@@ -135,12 +131,155 @@ if (!window.hasDOMCatcher) {
     return value !== defaultValues[property];
   };
 
+  // 提取伪元素样式并创建真实元素来模拟
+  const extractPseudoElementStyles = (element, cloneElement) => {
+    try {
+      const pseudoElements = ['::before', '::after'];
+      let pseudoElementsCreated = 0;
+      
+      pseudoElements.forEach(pseudo => {
+        try {
+          const pseudoStyles = window.getComputedStyle(element, pseudo);
+          const content = pseudoStyles.getPropertyValue('content');
+          
+          // 只有当伪元素确实存在内容时才处理
+          if (content && content !== 'none' && content !== 'normal') {
+            const pseudoSpan = document.createElement('span');
+            pseudoSpan.className = `pseudo-${pseudo.replace('::', '')}`;
+            
+            // 设置伪元素的内容
+            if (content.startsWith('"') && content.endsWith('"')) {
+              pseudoSpan.textContent = content.slice(1, -1); // 移除引号
+            } else if (content !== '""') {
+              pseudoSpan.textContent = content;
+            }
+            
+            // 提取并应用伪元素样式
+            const pseudoInlineStyles = [];
+            
+            // 伪元素特有的样式属性
+            const pseudoProperties = [
+              'content', 'position', 'top', 'left', 'right', 'bottom',
+              'width', 'height', 'display', 'color', 'background-color',
+              'font-size', 'font-weight', 'line-height', 'z-index',
+              'transform', 'opacity', 'border', 'border-radius',
+              'box-shadow', 'text-shadow', 'margin', 'padding'
+            ];
+            
+            pseudoProperties.forEach(property => {
+              const value = pseudoStyles.getPropertyValue(property);
+              if (value && value !== '' && value !== 'none' && value !== 'normal') {
+                if (property === 'content') {
+                  // content 属性不需要内联，因为已经设置了 textContent
+                  return;
+                }
+                pseudoInlineStyles.push(`${property}: ${value}`);
+              }
+            });
+            
+            if (pseudoInlineStyles.length > 0) {
+              pseudoSpan.setAttribute('style', pseudoInlineStyles.join('; '));
+            }
+            
+            // 添加伪元素标识属性
+            pseudoSpan.setAttribute('data-pseudo-element', pseudo);
+            
+            // 将伪元素插入到正确的位置
+            if (pseudo === '::before') {
+              cloneElement.insertBefore(pseudoSpan, cloneElement.firstChild);
+            } else {
+              cloneElement.appendChild(pseudoSpan);
+            }
+            
+            pseudoElementsCreated++;
+          }
+        } catch (err) {
+          console.warn(`处理伪元素 ${pseudo} 时出错:`, err);
+        }
+      });
+      
+      return pseudoElementsCreated;
+    } catch (error) {
+      console.warn('提取伪元素样式时出错:', error);
+      return 0;
+    }
+  };
+
+  // 提取CSS动画和过渡效果
+  const extractAnimationStyles = (element) => {
+    try {
+      const computedStyle = window.getComputedStyle(element);
+      const animationStyles = [];
+      
+      // 动画相关属性
+      const animationProperties = [
+        'animation', 'animation-name', 'animation-duration', 
+        'animation-timing-function', 'animation-delay', 
+        'animation-iteration-count', 'animation-direction',
+        'animation-fill-mode', 'animation-play-state',
+        'transition', 'transition-property', 'transition-duration',
+        'transition-timing-function', 'transition-delay'
+      ];
+      
+      animationProperties.forEach(property => {
+        const value = computedStyle.getPropertyValue(property);
+        if (value && value !== 'none' && value !== 'all 0s ease 0s' && value !== '0s') {
+          animationStyles.push(`${property}: ${value}`);
+        }
+      });
+      
+      return animationStyles;
+    } catch (error) {
+      console.warn('提取动画样式时出错:', error);
+      return [];
+    }
+  };
+
+  // 提取并生成CSS关键帧动画
+  const extractKeyframes = () => {
+    try {
+      const styleSheets = Array.from(document.styleSheets);
+      const keyframes = [];
+      
+      styleSheets.forEach(sheet => {
+        try {
+          if (sheet.cssRules) {
+            Array.from(sheet.cssRules).forEach(rule => {
+              if (rule.type === CSSRule.KEYFRAMES_RULE) {
+                keyframes.push(rule.cssText);
+              }
+            });
+          }
+        } catch (e) {
+          // 跨域样式表可能无法访问，跳过
+          console.warn('无法访问样式表:', e);
+        }
+      });
+      
+      return keyframes;
+    } catch (error) {
+      console.warn('提取关键帧动画时出错:', error);
+      return [];
+    }
+  };
+
   // 提取并内联样式到元素
   const extractAndInlineStyles = (element, clone) => {
     try {
       const elementsToProcess = [element, ...element.querySelectorAll('*')];
       const cloneElementsToProcess = [clone, ...clone.querySelectorAll('*')];
       let processedCount = 0;
+      let pseudoElementsCount = 0;
+      let animatedElementsCount = 0;
+      
+      // 首先提取页面中的关键帧动画
+      const keyframes = extractKeyframes();
+      let extractedKeyframes = '';
+      
+      if (keyframes.length > 0) {
+        extractedKeyframes = `<style>\n${keyframes.join('\n')}\n</style>\n`;
+        console.log(`🎬 提取了 ${keyframes.length} 个关键帧动画`);
+      }
       
       elementsToProcess.forEach((el,index) => {
         try {
@@ -163,11 +302,24 @@ if (!window.hasDOMCatcher) {
             }
           });
           
+          // 提取动画相关样式
+          const animationStyles = extractAnimationStyles(el);
+          if (animationStyles.length > 0) {
+            inlineStyles.push(...animationStyles);
+            animatedElementsCount++;
+          }
+          
           // 应用内联样式
           if (inlineStyles.length > 0) {
             // 去重和合并样式
             const styleString = inlineStyles.join('; ');
             cloneEl.setAttribute('style', styleString);
+          }
+          
+          // 处理伪元素（只对顶级元素处理，避免重复）
+          if (index === 0 || !elementsToProcess.slice(0, index).some(parent => parent.contains(el))) {
+            const pseudoCount = extractPseudoElementStyles(el, cloneEl);
+            pseudoElementsCount += pseudoCount;
           }
           
           // 删除 class和id属性
@@ -180,7 +332,24 @@ if (!window.hasDOMCatcher) {
         }
       });
       
+      // 如果有关键帧动画，将其插入到克隆元素的开头
+      if (extractedKeyframes) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = extractedKeyframes;
+        const styleElement = tempDiv.querySelector('style');
+        if (styleElement) {
+          clone.insertBefore(styleElement, clone.firstChild);
+        }
+      }
+      
       console.log(`✅ 样式提取完成，处理了 ${processedCount} 个元素`);
+      if (pseudoElementsCount > 0) {
+        console.log(`🎭 创建了 ${pseudoElementsCount} 个伪元素`);
+      }
+      if (animatedElementsCount > 0) {
+        console.log(`🎬 处理了 ${animatedElementsCount} 个动画元素`);
+      }
+      
       return element;
       
     } catch (error) {
@@ -195,7 +364,7 @@ if (!window.hasDOMCatcher) {
     const clone = element.cloneNode(true);
     // 先提取并内联样式
     console.log('🎨 开始提取样式...');
-    extractAndInlineStyles(element,clone);
+    extractAndInlineStyles(element, clone);
 
     const currentPath = window.location.href;
     
@@ -310,7 +479,10 @@ if (!window.hasDOMCatcher) {
         totalImages: processedElement.querySelectorAll('img[src]').length,  
         totalLinks: processedElement.querySelectorAll('a[href]').length,
         hasBackgroundImages: processedElement.querySelectorAll('*[style*="background-image"]').length > 0,
-        styledElements: processedElement.querySelectorAll('*[style]').length
+        styledElements: processedElement.querySelectorAll('*[style]').length,
+        pseudoElements: processedElement.querySelectorAll('*[data-pseudo-element]').length,
+        animatedElements: processedElement.querySelectorAll('*[style*="animation"]').length,
+        hasKeyframes: processedElement.querySelector('style') ? true : false
       }
     };
 
@@ -437,5 +609,5 @@ if (!window.hasDOMCatcher) {
   document.addEventListener('keydown', escapeHandler);
   
   // 显示开始提示
-  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n✨ 新功能：自动提取并保留样式\n📝 同时生成 HTML 和 Markdown 文件');
+  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n✨ 高级样式提取：支持伪元素和动画\n📝 同时生成 HTML 和 Markdown 文件');
 }
