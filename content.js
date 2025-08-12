@@ -317,11 +317,9 @@ if (!window.hasDOMCatcher) {
             cloneEl.setAttribute('style', styleString);
           }
           
-          // 处理伪元素（只对顶级元素处理，避免重复）
-          if (index === 0 || !elementsToProcess.slice(0, index).some(parent => parent.contains(el))) {
-            const pseudoCount = extractPseudoElementStyles(el, cloneEl);
-            pseudoElementsCount += pseudoCount;
-          }
+          // 处理伪元素（为每个元素单独提取伪元素样式）
+          const pseudoCount = extractPseudoElementStyles(el, cloneEl);
+          pseudoElementsCount += pseudoCount;
           
           // 删除 class和id属性
           cloneEl.removeAttribute('class');
@@ -335,12 +333,7 @@ if (!window.hasDOMCatcher) {
       
       // 如果有关键帧动画，将其插入到克隆元素的开头
       if (extractedKeyframes) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = extractedKeyframes;
-        const styleElement = tempDiv.querySelector('style');
-        if (styleElement) {
-          clone.insertBefore(styleElement, clone.firstChild);
-        }
+        clone.insertAdjacentHTML('afterbegin', extractedKeyframes);
       }
       
       console.log(`✅ 样式提取完成，处理了 ${processedCount} 个元素`);
@@ -458,6 +451,9 @@ if (!window.hasDOMCatcher) {
     event.preventDefault();
     event.stopPropagation();
 
+    // 清理工作
+    cleanup();
+
     const targetElement = event.target;
     
     // 处理相对链接转换为绝对链接
@@ -491,9 +487,6 @@ if (!window.hasDOMCatcher) {
 
     // 显示成功提示
     showNotification('正在发送元素到服务器并生成文件...');
-
-    // 清理工作
-    cleanup();
 
     // 发送到配置的服务器
     try {
