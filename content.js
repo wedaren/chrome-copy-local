@@ -68,9 +68,298 @@ if (!window.hasDOMCatcher) {
     lastElement = event.target;
   };
 
-  // 2.5. 处理相对链接转绝对链接的函数 - 优化版本（单次遍历）
+  // 2.5. 样式提取相关函数
+  
+  // 重要样式属性列表 - 这些属性对视觉效果最重要
+  const IMPORTANT_STYLE_PROPERTIES = [
+    // 布局相关
+    'display', 'position', 'top', 'left', 'right', 'bottom',
+    'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+    'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'border', 'border-width', 'border-style', 'border-color',
+    'border-top', 'border-right', 'border-bottom', 'border-left',
+    'border-radius', 'box-sizing', 'overflow', 'overflow-x', 'overflow-y',
+    'float', 'clear', 'z-index',
+    
+    // 字体和文本相关
+    'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
+    'line-height', 'text-align', 'text-decoration', 'text-transform',
+    'text-indent', 'text-shadow', 'letter-spacing', 'word-spacing',
+    'color', 'white-space', 'word-wrap', 'word-break',
+    
+    // 背景相关
+    'background', 'background-color', 'background-image', 'background-repeat',
+    'background-position', 'background-size', 'background-attachment',
+    
+    // 视觉效果
+    'opacity', 'visibility', 'transform', 'transform-origin',
+    'box-shadow', 'text-shadow', 'filter',
+    
+    // 弹性布局
+    'flex', 'flex-direction', 'flex-wrap', 'flex-basis', 'flex-grow', 'flex-shrink',
+    'justify-content', 'align-items', 'align-self', 'align-content',
+    
+    // 网格布局
+    'grid', 'grid-template-columns', 'grid-template-rows', 'grid-gap',
+    'grid-column', 'grid-row'
+  ];
+
+  // 检查样式值是否为有意义的非默认值
+  const isSignificantStyleValue = (property, value, element) => {
+    if (!value || value === '' || value === 'auto' || value === 'none' || value === 'normal') {
+      return false;
+    }
+    
+    // 检查一些常见的默认值
+    const defaultValues = {
+      'margin': '0px',
+      'margin-top': '0px', 'margin-right': '0px', 'margin-bottom': '0px', 'margin-left': '0px',
+      'padding': '0px',
+      'padding-top': '0px', 'padding-right': '0px', 'padding-bottom': '0px', 'padding-left': '0px',
+      'border-width': '0px',
+      'opacity': '1',
+      'font-weight': '400',
+      'text-decoration': 'none solid rgb(0, 0, 0)',
+      'text-align': 'start',
+      'position': 'static',
+      'display': (() => {
+      const blockTags = ['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'SECTION', 'ARTICLE', 'ASIDE', 'FOOTER', 'HEADER', 'NAV', 'MAIN'];
+      const inlineTags = ['SPAN', 'A', 'STRONG', 'EM', 'B', 'I', 'CODE'];
+      if (blockTags.includes(element.tagName)) return 'block';
+      if (inlineTags.includes(element.tagName)) return 'inline';
+      return '';
+      })(),
+      'background-color': 'rgba(0, 0, 0, 0)',
+      'color': 'rgb(0, 0, 0)'
+    };
+    
+    return value !== defaultValues[property];
+  };
+
+  // 提取伪元素样式并创建真实元素来模拟
+  const extractPseudoElementStyles = (element, cloneElement) => {
+    try {
+      const pseudoElements = ['::before', '::after'];
+      let pseudoElementsCreated = 0;
+      
+      pseudoElements.forEach(pseudo => {
+        try {
+          const pseudoStyles = window.getComputedStyle(element, pseudo);
+          const content = pseudoStyles.getPropertyValue('content');
+          
+          // 只有当伪元素确实存在内容时才处理
+          if (content && content !== 'none' && content !== 'normal') {
+            const pseudoSpan = document.createElement('span');
+            pseudoSpan.className = `pseudo-${pseudo.replace('::', '')}`;
+            
+            // 设置伪元素的内容
+            if (content.startsWith('"') && content.endsWith('"')) {
+              pseudoSpan.textContent = content.slice(1, -1); // 移除引号
+            } else if (content !== '""') {
+              pseudoSpan.textContent = content;
+            }
+            
+            // 提取并应用伪元素样式
+            const pseudoInlineStyles = [];
+            
+            // 伪元素特有的样式属性
+            const pseudoProperties = [
+              'content', 'position', 'top', 'left', 'right', 'bottom',
+              'width', 'height', 'display', 'color', 'background-color',
+              'font-size', 'font-weight', 'line-height', 'z-index',
+              'transform', 'opacity', 'border', 'border-radius',
+              'box-shadow', 'text-shadow', 'margin', 'padding'
+            ];
+            
+            pseudoProperties.forEach(property => {
+              const value = pseudoStyles.getPropertyValue(property);
+              if (value && value !== '' && value !== 'none' && value !== 'normal') {
+                if (property === 'content') {
+                  // content 属性不需要内联，因为已经设置了 textContent
+                  return;
+                }
+                pseudoInlineStyles.push(`${property}: ${value}`);
+              }
+            });
+            
+            if (pseudoInlineStyles.length > 0) {
+              pseudoSpan.setAttribute('style', pseudoInlineStyles.join('; '));
+            }
+            
+            // 添加伪元素标识属性
+            pseudoSpan.setAttribute('data-pseudo-element', pseudo);
+            
+            // 将伪元素插入到正确的位置
+            if (pseudo === '::before') {
+              cloneElement.insertBefore(pseudoSpan, cloneElement.firstChild);
+            } else {
+              cloneElement.appendChild(pseudoSpan);
+            }
+            
+            pseudoElementsCreated++;
+          }
+        } catch (err) {
+          console.warn(`处理伪元素 ${pseudo} 时出错:`, err);
+        }
+      });
+      
+      return pseudoElementsCreated;
+    } catch (error) {
+      console.warn('提取伪元素样式时出错:', error);
+      return 0;
+    }
+  };
+
+  // 提取CSS动画和过渡效果
+  const extractAnimationStyles = (element) => {
+    try {
+      const computedStyle = window.getComputedStyle(element);
+      const animationStyles = [];
+      
+      // 动画相关属性
+      const animationProperties = [
+        'animation', 'animation-name', 'animation-duration', 
+        'animation-timing-function', 'animation-delay', 
+        'animation-iteration-count', 'animation-direction',
+        'animation-fill-mode', 'animation-play-state',
+        'transition', 'transition-property', 'transition-duration',
+        'transition-timing-function', 'transition-delay'
+      ];
+      
+      animationProperties.forEach(property => {
+        const value = computedStyle.getPropertyValue(property);
+        if (value && value !== 'none' && value !== 'all 0s ease 0s' && value !== '0s') {
+          animationStyles.push(`${property}: ${value}`);
+        }
+      });
+      
+      return animationStyles;
+    } catch (error) {
+      console.warn('提取动画样式时出错:', error);
+      return [];
+    }
+  };
+
+  // 提取并生成CSS关键帧动画
+  const extractKeyframes = () => {
+    try {
+      const styleSheets = Array.from(document.styleSheets);
+      const keyframes = [];
+      
+      styleSheets.forEach(sheet => {
+        try {
+          if (sheet.cssRules) {
+            Array.from(sheet.cssRules).forEach(rule => {
+              if (rule.type === CSSRule.KEYFRAMES_RULE) {
+                keyframes.push(rule.cssText);
+              }
+            });
+          }
+        } catch (e) {
+          // 跨域样式表可能无法访问，跳过
+          console.warn('无法访问样式表:', e);
+        }
+      });
+      
+      return keyframes;
+    } catch (error) {
+      console.warn('提取关键帧动画时出错:', error);
+      return [];
+    }
+  };
+
+  // 提取并内联样式到元素
+  const extractAndInlineStyles = (element, clone) => {
+    try {
+      const elementsToProcess = [element, ...element.querySelectorAll('*')];
+      const cloneElementsToProcess = [clone, ...clone.querySelectorAll('*')];
+      let processedCount = 0;
+      let pseudoElementsCount = 0;
+      let animatedElementsCount = 0;
+      
+      // 首先提取页面中的关键帧动画
+      const keyframes = extractKeyframes();
+      let extractedKeyframes = '';
+      
+      if (keyframes.length > 0) {
+        extractedKeyframes = `<style>\n${keyframes.join('\n')}\n</style>\n`;
+        console.log(`🎬 提取了 ${keyframes.length} 个关键帧动画`);
+      }
+      
+      elementsToProcess.forEach((el,index) => {
+        try {
+          const cloneEl = cloneElementsToProcess[index];
+          // 获取计算后的样式
+          const computedStyle = window.getComputedStyle(el);
+          const inlineStyles = [];
+          
+          
+          // 遍历重要样式属性
+          IMPORTANT_STYLE_PROPERTIES.forEach(property => {
+            const value = computedStyle.getPropertyValue(property);
+            if (isSignificantStyleValue(property, value, el)) {
+              inlineStyles.push(`${property}: ${value}`);
+            }
+          });
+          
+          // 提取动画相关样式
+          const animationStyles = extractAnimationStyles(el);
+          if (animationStyles.length > 0) {
+            inlineStyles.push(...animationStyles);
+            animatedElementsCount++;
+          }
+          
+          // 应用内联样式
+          if (inlineStyles.length > 0) {
+            // 去重和合并样式
+            const styleString = inlineStyles.join('; ');
+            cloneEl.setAttribute('style', styleString);
+          }
+          
+          // 处理伪元素（为每个元素单独提取伪元素样式）
+          const pseudoCount = extractPseudoElementStyles(el, cloneEl);
+          pseudoElementsCount += pseudoCount;
+          
+          // 删除 class和id属性
+          cloneEl.removeAttribute('class');
+          cloneEl.removeAttribute('id');
+
+          processedCount++;
+        } catch (err) {
+          console.warn('处理元素样式时出错:', err, cloneEl);
+        }
+      });
+      
+      // 如果有关键帧动画，将其插入到克隆元素的开头
+      if (extractedKeyframes) {
+        clone.insertAdjacentHTML('afterbegin', extractedKeyframes);
+      }
+      
+      console.log(`✅ 样式提取完成，处理了 ${processedCount} 个元素`);
+      if (pseudoElementsCount > 0) {
+        console.log(`🎭 创建了 ${pseudoElementsCount} 个伪元素`);
+      }
+      if (animatedElementsCount > 0) {
+        console.log(`🎬 处理了 ${animatedElementsCount} 个动画元素`);
+      }
+      
+      return clone;
+      
+    } catch (error) {
+      console.error('样式提取过程中出现错误:', error);
+      // 如果样式提取失败，返回原元素以保证基本功能
+      return clone;
+    }
+  };
+
+  // 处理相对链接转绝对链接的函数 - 优化版本（单次遍历）
   const convertRelativeToAbsolute = (element) => {
     const clone = element.cloneNode(true);
+    // 先提取并内联样式
+    console.log('🎨 开始提取样式...');
+    extractAndInlineStyles(element, clone);
+
     const currentPath = window.location.href;
     
     // 辅助函数：检查URL是否需要转换
@@ -94,6 +383,10 @@ if (!window.hasDOMCatcher) {
         return url; // 返回原始URL
       }
     };
+    
+    
+    // 然后处理链接转换
+    console.log('🔗 开始转换链接...');
     
     // 单次遍历处理所有元素
     const elementsToProcess = [clone, ...clone.querySelectorAll('*')];
@@ -158,6 +451,9 @@ if (!window.hasDOMCatcher) {
     event.preventDefault();
     event.stopPropagation();
 
+    // 清理工作
+    cleanup();
+
     const targetElement = event.target;
     
     // 处理相对链接转换为绝对链接
@@ -175,11 +471,15 @@ if (!window.hasDOMCatcher) {
       baseUrl: window.location.origin,
       pageTitle: document.title || '',
       timestamp: new Date().toISOString(),
-      // 统计转换的链接信息
+      // 统计转换的链接信息和样式信息
       linkStats: {
         totalImages: processedElement.querySelectorAll('img[src]').length,  
         totalLinks: processedElement.querySelectorAll('a[href]').length,
-        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background-image"]').length > 0
+        hasBackgroundImages: processedElement.querySelectorAll('*[style*="background-image"]').length > 0,
+        styledElements: processedElement.querySelectorAll('*[style]').length,
+        pseudoElements: processedElement.querySelectorAll('*[data-pseudo-element]').length,
+        animatedElements: processedElement.querySelectorAll('*[style*="animation"]').length,
+        hasKeyframes: processedElement.querySelector('style') ? true : false
       }
     };
 
@@ -187,9 +487,6 @@ if (!window.hasDOMCatcher) {
 
     // 显示成功提示
     showNotification('正在发送元素到服务器并生成文件...');
-
-    // 清理工作
-    cleanup();
 
     // 发送到配置的服务器
     try {
@@ -306,5 +603,5 @@ if (!window.hasDOMCatcher) {
   document.addEventListener('keydown', escapeHandler);
   
   // 显示开始提示
-  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n现在会同时生成 HTML 和 Markdown 文件');
+  showNotification('🎯 元素选择模式已激活\n悬停查看元素，点击选择，按ESC退出\n✨ 高级样式提取：支持伪元素和动画\n📝 同时生成 HTML 和 Markdown 文件');
 }

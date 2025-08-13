@@ -322,7 +322,7 @@ app.post('/receive-dom', async (req, res) => {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const safeTagName = info?.tagName || 'element';
-    const baseFilename = `${safeTagName}-${timestamp}`;
+    const baseFilename = `${timestamp}-${safeTagName}`;
     const htmlFilename = `${baseFilename}.html`;
     const markdownFilename = `${baseFilename}.md`;
     
@@ -428,6 +428,15 @@ app.post('/receive-dom', async (req, res) => {
         图片: ${info.linkStats.totalImages || 0} 个 | 
         链接: ${info.linkStats.totalLinks || 0} 个
         ${info.linkStats.hasBackgroundImages ? ' | 包含背景图片' : ''}
+      </span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">🎨 样式统计:</span>
+      <span class="info-value">
+        ${info.linkStats.styledElements || 0} 个元素包含内联样式
+        ${info.linkStats.pseudoElements ? ` | ${info.linkStats.pseudoElements} 个伪元素` : ''}
+        ${info.linkStats.animatedElements ? ` | ${info.linkStats.animatedElements} 个动画元素` : ''}
+        ${info.linkStats.hasKeyframes ? ' | 包含关键帧动画' : ''}
       </span>
     </div>
     <div class="info-item">
