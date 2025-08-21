@@ -635,7 +635,10 @@ app.get('/manage', (req, res) => {
 const startServer = async () => {
   await initializeOutputDir();
   
-  const server = app.listen(port, '127.0.0.1', () => {
+  // 在 Docker 容器中使用 0.0.0.0，本地开发使用 127.0.0.1
+  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+  
+  const server = app.listen(port, host, () => {
     console.log(`
 📡 服务地址: http://localhost:${port}
 📁 保存目录: ${outputDir}

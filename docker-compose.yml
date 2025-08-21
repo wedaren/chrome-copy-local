@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  dom-catcher-server:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./captured:/app/captured
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

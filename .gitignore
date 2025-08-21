@@ -108,3 +108,10 @@ captured/*.css
 # Temporary files
 tmp/
 temp/
+
+# Docker files
+docker-compose.override.yml
+
+# Build artifacts
+dist/
+build/
