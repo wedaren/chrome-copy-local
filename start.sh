@@ -26,6 +26,7 @@ show_help() {
     echo "  build         构建 Docker 镜像"
     echo "  push          推送镜像到注册表"
     echo "  test          运行测试"
+    echo "  tailscale     测试 Tailscale 连接"
     echo "  clean         清理 Docker 资源"
     echo "  status        检查服务状态"
     echo "  logs          查看日志"
@@ -85,6 +86,17 @@ push_image() {
 run_tests() {
     echo -e "${GREEN}🧪 运行测试...${NC}"
     npm test
+}
+
+# 测试 Tailscale 连接
+test_tailscale() {
+    echo -e "${GREEN}🔗 测试 Tailscale 连接...${NC}"
+    if [ -f "./scripts/test-tailscale.sh" ]; then
+        ./scripts/test-tailscale.sh "$@"
+    else
+        echo -e "${RED}❌ 测试脚本不存在: ./scripts/test-tailscale.sh${NC}"
+        exit 1
+    fi
 }
 
 # 清理 Docker 资源
@@ -148,6 +160,10 @@ main() {
             ;;
         "test")
             run_tests
+            ;;
+        "tailscale")
+            shift  # 移除 'tailscale' 参数
+            test_tailscale "$@"  # 传递剩余参数
             ;;
         "clean")
             clean_docker

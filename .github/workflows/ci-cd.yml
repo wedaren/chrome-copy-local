@@ -28,12 +28,12 @@ jobs:
       run: npm ci
       
     - name: 运行测试
-      run: npm test || true  # 暂时允许测试失败
+      run: npm test
       
     - name: 代码质量检查
       run: |
         echo "检查代码格式..."
-        # 如果有 ESLint 可以在这里运行
+        # 基础检查已在 npm test 中完成
         
   build-and-push:
     needs: test
@@ -86,6 +86,30 @@ jobs:
     if: github.ref == 'refs/heads/main'
     
     steps:
+    - name: 连接到 Tailscale 网络
+      uses: tailscale/github-action@v2
+      with:
+        oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+        oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+        tags: tag:ci
+        
+    - name: 等待 Tailscale 连接建立
+      run: |
+        echo "等待 Tailscale 连接建立..."
+        sleep 5
+        tailscale status
+        
+    - name: 验证目标服务器连通性
+      run: |
+        echo "验证到目标服务器的连接..."
+        ping -c 3 ${{ secrets.SERVER_HOST }} || {
+          echo "❌ 无法连接到服务器 ${{ secrets.SERVER_HOST }}"
+          echo "检查 Tailscale 网络配置和服务器状态"
+          tailscale status
+          exit 1
+        }
+        echo "✅ 服务器连接正常"
+        
     - name: 部署到服务器
       uses: appleboy/ssh-action@v1.0.0
       with:
