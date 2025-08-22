@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+# 添加必要的权限
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
