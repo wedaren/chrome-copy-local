@@ -636,7 +636,7 @@ const startServer = async () => {
   await initializeOutputDir();
   
   // 在 Docker 容器中使用 0.0.0.0，本地开发使用 127.0.0.1
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+  const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
   
   const server = app.listen(port, host, () => {
     console.log(`
