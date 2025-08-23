@@ -117,16 +117,6 @@ jobs:
         }
         echo "✅ 服务器连接正常"
         
-    - name: 上传部署脚本
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        port: 22
-        source: "scripts/deploy.sh"
-        target: "/tmp/"
-        
     - name: 部署到服务器
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -138,8 +128,65 @@ jobs:
           # 登录到 GitHub Container Registry
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           
-          # 设置脚本可执行权限
-          chmod +x /tmp/scripts/deploy.sh
+          # 创建临时部署脚本
+          cat > /tmp/deploy.sh << 'EOF'
+          #!/bin/bash
+          set -e
           
-          # 执行部署脚本
-          /tmp/scripts/deploy.sh production ${{ needs.build-and-push.outputs.image-tag }}
+          ENVIRONMENT=${1:-production}
+          IMAGE_TAG=${2:-latest}
+          CONTAINER_NAME="dom-catcher-server"
+          IMAGE_NAME="ghcr.io/wedaren/chrome-copy-local"
+          
+          echo "🚀 开始部署 DOM Catcher 服务器..."
+          echo "环境: $ENVIRONMENT"
+          echo "镜像: $IMAGE_NAME:$IMAGE_TAG"
+          
+          # 停止现有容器
+          echo "⏹️  停止现有容器..."
+          docker stop $CONTAINER_NAME 2>/dev/null || true
+          docker rm $CONTAINER_NAME 2>/dev/null || true
+          
+          # 拉取最新镜像
+          echo "📥 拉取最新镜像..."
+          docker pull $IMAGE_NAME:$IMAGE_TAG
+          
+          # 创建必要的目录
+          echo "📁 创建必要的目录..."
+          sudo mkdir -p /opt/dom-catcher/captured
+          sudo chown -R 1000:1000 /opt/dom-catcher
+          
+          # 运行新容器
+          echo "🏃 启动新容器..."
+          docker run -d \
+            --name $CONTAINER_NAME \
+            --restart unless-stopped \
+            -p 3000:3000 \
+            -v /opt/dom-catcher/captured:/app/captured \
+            -e NODE_ENV=$ENVIRONMENT \
+            $IMAGE_NAME:$IMAGE_TAG
+          
+          # 等待服务启动
+          echo "⏳ 等待服务启动..."
+          sleep 15
+          
+          # 检查服务状态
+          echo "🔍 检查服务状态..."
+          if curl -f -s http://localhost:3000/status > /dev/null; then
+              echo "✅ 部署成功！服务正常运行"
+              echo "📊 容器状态:"
+              docker ps | grep $CONTAINER_NAME || true
+              echo "🌐 服务地址: http://localhost:3000"
+          else
+              echo "❌ 部署失败！服务无法访问"
+              echo "📝 容器日志:"
+              docker logs $CONTAINER_NAME
+              echo "📊 容器状态:"
+              docker ps -a | grep $CONTAINER_NAME || true
+              exit 1
+          fi
+          EOF
+          
+          # 设置脚本可执行权限并执行
+          chmod +x /tmp/deploy.sh
+          /tmp/deploy.sh production ${{ needs.build-and-push.outputs.image-tag }}
