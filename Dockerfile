@@ -15,7 +15,6 @@ RUN npm ci --only=production
 
 # 复制应用代码和健康检查脚本
 COPY --chown=node:node . .
-COPY --chown=node:node healthcheck.sh ./
 RUN chmod +x ./healthcheck.sh
 
 # 切换到非 root 用户
