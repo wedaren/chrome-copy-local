@@ -183,10 +183,11 @@ jobs:
               exit 1
           fi
           
-          # 创建必要的目录
+          # 创建必要的目录（使用用户目录，避免 sudo）
           echo "📁 创建必要的目录..."
-          sudo mkdir -p /opt/dom-catcher/captured
-          sudo chown -R 1000:1000 /opt/dom-catcher
+          CAPTURE_DIR="$HOME/dom-catcher/captured"
+          mkdir -p "$CAPTURE_DIR"
+          echo "✅ 创建目录: $CAPTURE_DIR"
           
           # 运行新容器
           echo "🏃 启动新容器..."
@@ -194,7 +195,7 @@ jobs:
             --name "$CONTAINER_NAME" \
             --restart unless-stopped \
             -p 3000:3000 \
-            -v /opt/dom-catcher/captured:/app/captured \
+            -v "$CAPTURE_DIR:/app/captured" \
             -e "NODE_ENV=$ENVIRONMENT" \
             "$IMAGE_NAME:$IMAGE_TAG"
           
