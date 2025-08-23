@@ -46,20 +46,29 @@ docker run -d \
   -e NODE_ENV=$ENVIRONMENT \
   $IMAGE_NAME:$IMAGE_TAG
 
-# 等待服务启动
-echo "⏳ 等待服务启动..."
-sleep 15
+# 等待服务变为健康状态
+echo "⏳ 等待服务变为健康状态..."
+deployed_successfully=false
+for i in {1..20}; do # 等待最多 60 秒
+    status=$(docker inspect -f '{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null)
+    if [ "$status" = "healthy" ]; then
+        echo "✅ 部署成功！服务正常运行"
+        deployed_successfully=true
+        break
+    elif [ "$status" = "unhealthy" ]; then
+        echo "❌ 部署失败！服务健康状态异常。"
+        break
+    fi
+    sleep 3
+done
 
-# 检查服务状态
-echo "🔍 检查服务状态..."
-if curl -f http://localhost:3000/status; then
-  echo "✅ 部署成功！服务正常运行"
-  echo "📊 容器状态:"
-  docker ps | grep $CONTAINER_NAME
-  echo "📝 查看日志: docker logs $CONTAINER_NAME"
+if $deployed_successfully; then
+    echo "📊 容器状态:"
+    docker ps | grep $CONTAINER_NAME
+    echo "📝 查看日志: docker logs $CONTAINER_NAME"
 else
-  echo "❌ 部署失败！服务无法访问"
-  echo "📝 容器日志:"
-  docker logs $CONTAINER_NAME
-  exit 1
+    echo "❌ 部署失败！服务在规定时间内未启动或未通过健康检查。"
+    echo "📝 容器日志:"
+    docker logs $CONTAINER_NAME
+    exit 1
 fi
