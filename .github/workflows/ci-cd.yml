@@ -127,17 +127,12 @@ jobs:
         port: 22
         script: |
           # 登录到 GitHub Container Registry
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           
-          # 创建临时部署脚本
-          cat > /tmp/deploy.sh << 'EOF'
-          #!/bin/bash
-          set -e
-          
-          ENVIRONMENT=${1:-production}
-          IMAGE_TAG=${2:-latest}
+          # 直接执行部署命令，不使用临时脚本
+          ENVIRONMENT="production"
+          IMAGE_TAG="latest"
           CONTAINER_NAME="dom-catcher-server"
-          IMAGE_NAME="ghcr.io/wedaren/chrome-copy-local"
+          IMAGE_NAME="ghcr.io/${{ github.repository }}"
           
           # 确保 Docker 可用
           DOCKER_CMD="docker"
@@ -160,6 +155,9 @@ jobs:
           echo "环境: $ENVIRONMENT"
           echo "镜像: $IMAGE_NAME:$IMAGE_TAG"
           
+
+          echo "${{ secrets.GITHUB_TOKEN }}" | $DOCKER_CMD login ghcr.io -u ${{ github.actor }} --password-stdin
+
           # 停止现有容器
           echo "⏹️  停止现有容器..."
           $DOCKER_CMD stop $CONTAINER_NAME 2>/dev/null || true
@@ -219,8 +217,3 @@ jobs:
               $DOCKER_CMD ps -a | grep $CONTAINER_NAME || true
               exit 1
           fi
-          EOF
-          
-          # 设置脚本可执行权限并执行
-          chmod +x /tmp/deploy.sh
-          /tmp/deploy.sh production ${{ needs.build-and-push.outputs.image-tag }}
