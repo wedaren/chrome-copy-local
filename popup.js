@@ -74,19 +74,7 @@ async function onServerUrlChange() {
       console.error('Failed to save server config:', error);  
     }  
     updateStatus('offline', '未连接');
-    startSelectionButton.disabled = true;
-    
-    // 检查是否需要显示权限提示
-    if (!isLocalUrl(url)) {  
-      const smallEl = permissionInfo.querySelector('small');  
-      if (smallEl) {  
-        smallEl.textContent = '⚠️ 当前版本仅支持本地服务器连接';  
-        smallEl.style.color = '#e74c3c';  
-      }  
-      permissionInfo.style.display = 'block';  
-    } else {  
-      permissionInfo.style.display = 'none';  
-    }  
+    startSelectionButton.disabled = true;  
   }
 }
 
@@ -96,18 +84,6 @@ function isValidUrl(string) {
     const url = new URL(string);
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch (_) {
-    return false;
-  }
-}
-
-// 检查URL是否为本地地址
-function isLocalUrl(url) {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname === 'localhost' || 
-           urlObj.hostname === '127.0.0.1' || 
-           urlObj.hostname === '0.0.0.0';
-  } catch (error) {
     return false;
   }
 }
@@ -123,12 +99,6 @@ async function testServerConnection() {
 
   if (!isValidUrl(url)) {
     updateStatus('offline', '无效的URL格式');
-    return;
-  }
-
-  // 检查是否为外部URL
-  if (!isLocalUrl(url)) {
-    updateStatus('offline', '当前版本只支持本地服务器 (localhost/127.0.0.1)');
     return;
   }
 
