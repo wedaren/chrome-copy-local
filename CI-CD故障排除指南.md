@@ -4,20 +4,17 @@
 
 ### 错误症状
 
-在 GitHub Actions CI/CD 工作流中，出现以下错误：
+在 GitHub Actions CI/CD 工作流中，可能出现以下错误：
 
+#### 错误 1: 权限不足 (403)
 ```bash
-Run if [ -z "${HOSTNAME}" ]; then
-  if [ -z "${HOSTNAME}" ]; then
-    HOSTNAME="github-$(cat /etc/hostname)"
-  fi
-  if [ -n "***" ]; then
-    TAILSCALE_AUTHKEY="***?preauthorized=true&ephemeral=true"
-    TAGS_ARG="--advertise-tags=tag:ci"
-  fi
-  timeout 5m sudo -E tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
-
 Status: 403, Message: "calling actor does not have enough permissions to perform this function"
+Error: Process completed with exit code 1.
+```
+
+#### 错误 2: 标签权限问题 (400)
+```bash
+Status: 400, Message: "requested tags [tag:ci] are invalid or not permitted"
 Error: Process completed with exit code 1.
 ```
 
@@ -27,11 +24,15 @@ Error: Process completed with exit code 1.
 - **原因**: Tailscale OAuth 客户端或认证密钥权限不足
 - **影响**: 无法建立 Tailscale 网络连接，导致部署失败
 
-#### 2. 主机名冲突
+#### 2. 标签权限问题 (400 错误)
+- **原因**: 请求的标签 `tag:ci` 在 Tailscale 网络中未定义或 OAuth 客户端无权使用
+- **影响**: 设备无法使用指定标签加入网络
+
+#### 3. 主机名冲突
 - **原因**: 多个 GitHub Actions 运行器使用相同的主机名
 - **影响**: Tailscale 网络中的设备冲突
 
-#### 3. 认证配置问题
+#### 4. 认证配置问题
 - **原因**: 环境变量未正确设置或密钥过期
 - **影响**: 认证流程失败
 
@@ -54,16 +55,19 @@ Error: Process completed with exit code 1.
    TAILSCALE_OAUTH_SECRET=<OAuth客户端密钥>
    ```
 
-3. **修复主机名冲突**
+3. **修复标签权限问题**
    ```yaml
-   # 在 .github/workflows/ci-cd.yml 中添加唯一主机名
+   # 方案 A: 移除标签 (推荐，最简单)
    - name: 连接到 Tailscale 网络
      uses: tailscale/github-action@v2
      with:
        oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
        oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
-       tags: tag:ci
-       hostname: github-actions-${{ github.run_id }}  # 使用运行ID确保唯一性
+       hostname: github-actions-${{ github.run_id }}
+   
+   # 方案 B: 配置正确的标签
+   # 首先在 Tailscale 控制台中定义 tag:ci
+   # 然后确保 OAuth 客户端有使用该标签的权限
    ```
 
 #### 方案 2: 使用传统认证密钥

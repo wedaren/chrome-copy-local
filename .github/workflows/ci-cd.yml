@@ -97,7 +97,6 @@ jobs:
       with:
         oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
         oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
-        tags: tag:ci
         hostname: github-actions-${{ github.run_id }}
         
     - name: 等待 Tailscale 连接建立
