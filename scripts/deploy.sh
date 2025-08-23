@@ -12,7 +12,7 @@ IMAGE_NAME="ghcr.io/wedaren/chrome-copy-local"
 
 echo "🚀 开始部署 DOM Catcher 服务器..."
 echo "环境: $ENVIRONMENT"
-echo "镜像标签: $IMAGE_TAG"
+echo "镜像: $IMAGE_NAME:$IMAGE_TAG"
 
 # 停止现有容器
 echo "⏹️  停止现有容器..."
@@ -40,29 +40,22 @@ docker run -d \
   -e NODE_ENV=$ENVIRONMENT \
   $IMAGE_NAME:$IMAGE_TAG
 
-# 等待服务变为健康状态
-echo "⏳ 等待服务变为健康状态..."
-deployed_successfully=false
-for i in {1..20}; do # 等待最多 60 秒
-    status=$(docker inspect -f '{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null)
-    if [ "$status" = "healthy" ]; then
-        echo "✅ 部署成功！服务正常运行"
-        deployed_successfully=true
-        break
-    elif [ "$status" = "unhealthy" ]; then
-        echo "❌ 部署失败！服务健康状态异常。"
-        break
-    fi
-    sleep 3
-done
+# 等待服务启动并进行健康检查
+echo "⏳ 等待服务启动..."
+sleep 15
 
-if $deployed_successfully; then
+# 检查服务状态
+echo "🔍 检查服务状态..."
+if curl -f -s http://localhost:3000/status > /dev/null; then
+    echo "✅ 部署成功！服务正常运行"
     echo "📊 容器状态:"
-    docker ps | grep $CONTAINER_NAME
-    echo "📝 查看日志: docker logs $CONTAINER_NAME"
+    docker ps | grep $CONTAINER_NAME || true
+    echo "🌐 服务地址: http://localhost:3000"
 else
-    echo "❌ 部署失败！服务在规定时间内未启动或未通过健康检查。"
+    echo "❌ 部署失败！服务无法访问"
     echo "📝 容器日志:"
     docker logs $CONTAINER_NAME
+    echo "📊 容器状态:"
+    docker ps -a | grep $CONTAINER_NAME || true
     exit 1
 fi

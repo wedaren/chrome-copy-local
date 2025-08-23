@@ -117,6 +117,16 @@ jobs:
         }
         echo "✅ 服务器连接正常"
         
+    - name: 上传部署脚本
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        port: 22
+        source: "scripts/deploy.sh"
+        target: "/tmp/"
+        
     - name: 部署到服务器
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -125,37 +135,11 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
         script: |
-          # 停止现有容器
-          docker stop dom-catcher-server || true
-          docker rm dom-catcher-server || true
-          
           # 登录到 GitHub Container Registry
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           
-          # 拉取最新镜像
-          docker pull ${{ needs.build-and-push.outputs.image-tag }}
+          # 设置脚本可执行权限
+          chmod +x /tmp/scripts/deploy.sh
           
-          # 创建必要的目录
-          sudo mkdir -p /opt/dom-catcher/captured
-          sudo chown -R 1000:1000 /opt/dom-catcher
-          
-          # 运行新容器
-          docker run -d \
-            --name dom-catcher-server \
-            --restart unless-stopped \
-            -p 3000:3000 \
-            -v /opt/dom-catcher/captured:/app/captured \
-            -e NODE_ENV=production \
-            ${{ needs.build-and-push.outputs.image-tag }}
-            
-          # 等待服务启动
-          sleep 15
-          
-          # 检查服务状态
-          if curl -f http://localhost:3000/status; then
-            echo "✅ 部署成功！服务正常运行"
-          else
-            echo "❌ 部署失败！服务无法访问"
-            docker logs dom-catcher-server
-            exit 1
-          fi
+          # 执行部署脚本
+          /tmp/scripts/deploy.sh production ${{ needs.build-and-push.outputs.image-tag }}
