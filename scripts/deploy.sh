@@ -19,10 +19,6 @@ echo "⏹️  停止现有容器..."
 docker stop $CONTAINER_NAME 2>/dev/null || true
 docker rm $CONTAINER_NAME 2>/dev/null || true
 
-# 清理旧镜像
-echo "🧹 清理旧镜像..."
-docker image prune -f
-
 # 拉取最新镜像
 echo "📥 拉取最新镜像..."
 docker pull $IMAGE_NAME:$IMAGE_TAG
@@ -30,7 +26,6 @@ docker pull $IMAGE_NAME:$IMAGE_TAG
 # 创建必要的目录
 echo "📁 创建必要的目录..."
 sudo mkdir -p /opt/dom-catcher/captured
-sudo mkdir -p /opt/dom-catcher/logs
 
 # 设置目录权限
 sudo chown -R 1000:1000 /opt/dom-catcher
@@ -42,7 +37,6 @@ docker run -d \
   --restart unless-stopped \
   -p 3000:3000 \
   -v /opt/dom-catcher/captured:/app/captured \
-  -v /opt/dom-catcher/logs:/app/logs \
   -e NODE_ENV=$ENVIRONMENT \
   $IMAGE_NAME:$IMAGE_TAG
 
