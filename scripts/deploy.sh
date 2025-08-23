@@ -37,7 +37,23 @@ docker rm $CONTAINER_NAME 2>/dev/null || true
 
 # 拉取最新镜像
 echo "📥 拉取最新镜像..."
-docker pull $IMAGE_NAME:$IMAGE_TAG
+echo "🔍 检测系统架构: $(uname -m)"
+
+# 尝试拉取镜像，如果失败则提供解决方案
+if ! docker pull $IMAGE_NAME:$IMAGE_TAG; then
+    echo "❌ 镜像拉取失败"
+    echo "🔍 可能的原因: 架构不匹配"
+    echo "💡 解决方案:"
+    echo "   1. 等待多架构镜像构建完成 (需要重新推送代码)"
+    echo "   2. 或者在 x86_64 服务器上部署"
+    echo "   3. 或者本地构建镜像: docker build -t $IMAGE_NAME:$IMAGE_TAG ."
+    
+    # 检查是否有其他可用的镜像标签
+    echo "🔍 检查可用的镜像标签..."
+    docker images | grep "$(echo "$IMAGE_NAME" | cut -d'/' -f2-)" || true
+    
+    exit 1
+fi
 
 # 创建必要的目录
 echo "📁 创建必要的目录..."
