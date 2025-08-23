@@ -10,6 +10,22 @@ IMAGE_TAG=${2:-latest}
 CONTAINER_NAME="dom-catcher-server"
 IMAGE_NAME="ghcr.io/wedaren/chrome-copy-local"
 
+# 确保 Docker 可用
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker 未找到，尝试常见路径..."
+    if [ -f "/usr/local/bin/docker" ]; then
+        export PATH="/usr/local/bin:$PATH"
+        echo "✅ 使用 /usr/local/bin/docker"
+    elif [ -f "/usr/bin/docker" ]; then
+        export PATH="/usr/bin:$PATH"
+        echo "✅ 使用 /usr/bin/docker"
+    else
+        echo "❌ 无法找到 Docker，请确保 Docker 已安装"
+        exit 1
+    fi
+fi
+
+echo "🐳 Docker 版本: $(docker --version)"
 echo "🚀 开始部署 DOM Catcher 服务器..."
 echo "环境: $ENVIRONMENT"
 echo "镜像: $IMAGE_NAME:$IMAGE_TAG"
